@@ -46,6 +46,7 @@ function Root() {
   };
 
   if (initializing) return <Text>{t('common.loading')}</Text>;
+  // Only hit if the anonymous guest sign-in itself failed (e.g. disabled in Firebase).
   if (!user) return <LoginScreen />;
   if (onboardingDone === null) return <Text>{t('common.loading')}</Text>;
   if (onboardingDone === false) {

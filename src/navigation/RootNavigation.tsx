@@ -14,10 +14,12 @@ import PlanEditorScreen from '../screens/PlanEditorScreen';
 import RunPlanScreen from '../screens/RunPlanScreen';
 import PaywallScreen from '../screens/PaywallSccreen';
 import SafetyPlanEditorScreen from '../screens/SafetyPlanEditorScreen';
+import LoginScreen from '../screens/LoginScreen';
 
 
 export type RootStackParamList = {
     Tabs: undefined;
+    Auth: undefined;
     SOS: undefined;
     Mudras: undefined;
     ThoughtLog: undefined;
@@ -41,6 +43,7 @@ export default function RootNavigator() {
     return (
         <Stack.Navigator id="RootStack" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={AppTabs} />
+        <Stack.Screen name="Auth" component={LoginScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen
             name="SOS"
             component={SosScreen}

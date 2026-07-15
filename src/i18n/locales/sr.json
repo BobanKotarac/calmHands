@@ -101,6 +101,8 @@
   },
   "profile": {
     "title": "Profil",
+    "guestBannerTitle": "Sačuvaj svoj napredak",
+    "guestBannerDesc": "Trenutno koristiš gost nalog. Napravi nalog da sačuvaš podatke i pristupiš im sa drugog uređaja.",
     "noNickname": "Bez nick-a",
     "avatarHint": "(Za sad avatar je inicijal; upload dodajemo posle.)",
     "nickname": "Nickname",

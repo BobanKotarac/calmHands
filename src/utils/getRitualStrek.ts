@@ -13,6 +13,21 @@ function parseDayIdLocal(id: string) {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
+/** Pure: counts the consecutive-day streak ending today (or `referenceDate`) given a set of dayIds with activity. */
+export function computeRitualStreak(days: Set<string>, referenceDate: Date = new Date()): number {
+  if (!days.size) return 0;
+
+  let count = 0;
+  let cursor = parseDayIdLocal(todayIdLocal(referenceDate));
+  while (true) {
+    const id = todayIdLocal(cursor);
+    if (!days.has(id)) break;
+    count += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return count;
+}
+
 export async function getRitualStreak(uid: string) {
   const q = query(
     collection(db, 'users', uid, 'ritualEvents'),
@@ -28,15 +43,5 @@ export async function getRitualStreak(uid: string) {
     if (typeof x.dayId === 'string') days.add(x.dayId);
   });
 
-  if (!days.size) return 0;
-
-  let count = 0;
-  let cursor = parseDayIdLocal(todayIdLocal());
-  while (true) {
-    const id = todayIdLocal(cursor);
-    if (!days.has(id)) break;
-    count += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return count;
+  return computeRitualStreak(days);
 }

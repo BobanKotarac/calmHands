@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Root profile doc: settings, displayName, isPremium.
+    // isPremium is intentionally excluded from client writes — it must only ever
+    // be set by a trusted backend (e.g. a Cloud Function reacting to a verified
+    // purchase/webhook), never by the client SDK, or any signed-in user (including
+    // guests) could grant themselves premium via a raw setDoc/updateDoc call.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && !('isPremium' in request.resource.data);
+      allow update: if isOwner(uid)
+        && request.resource.data.isPremium == resource.data.isPremium;
+      allow delete: if false;
+
+      match /moods/{moodId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /thoughtLogs/{logId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /ritualPlans/{planId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /ritualEvents/{eventId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /ritualPlanReminders/{planId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /weeklyReflections/{weekId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+  }
+}

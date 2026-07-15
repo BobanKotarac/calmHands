@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../context/authContext';  // Tvoj auth
+import type { RootScreenNavigationProp } from '../navigation/types';
 
 export const PremiumContext = createContext({
   isPremium: false,
@@ -10,7 +11,7 @@ export const PremiumContext = createContext({
 });
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<RootScreenNavigationProp>();
   const { user } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
 

@@ -100,6 +100,8 @@
   },
   "profile": {
     "title": "Profile",
+    "guestBannerTitle": "Save your progress",
+    "guestBannerDesc": "You're currently using a guest account. Create an account to keep your data safe and access it on another device.",
     "noNickname": "No nickname",
     "avatarHint": "(Avatar is initial for now; upload later.)",
     "nickname": "Nickname",

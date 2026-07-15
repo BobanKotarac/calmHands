@@ -1,9 +1,10 @@
 import React from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { RootScreenNavigationProp } from '../navigation/types';
 
 const PaywallScreen = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<RootScreenNavigationProp>();
 
   return (
     <SafeAreaView style={styles.container}>

@@ -1,358 +1,3 @@
-// import React, { useEffect, useMemo, useState } from 'react';
-// import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-// import { VerticalCalendarHeatmap } from '../component/VerticalCalendarHeatmap';
-// import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
-// import { db } from '../firebase/firebase';
-// import { useAuth } from '../context/authContext';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { devSeedInsightsData } from '../utils/devSeed';
-// import { Dimensions } from 'react-native';
-// import { Modal } from 'react-native';
-
-
-
-
-
-// type MoodDoc = { value: number; updatedAt?: any; dayId?: string };
-// type ThoughtLogDoc = { intensityAfter?: number; createdAt?: any };
-
-// type MoodRow = { id: string; data: MoodDoc };
-// type ThoughtRow = { id: string; data: ThoughtLogDoc };
-
-// const isNumber = (x: unknown): x is number => typeof x === 'number';
-
-// function toDayIdLocal(d: Date) {
-//   const yyyy = d.getFullYear();
-//   const mm = String(d.getMonth() + 1).padStart(2, '0');
-//   const dd = String(d.getDate()).padStart(2, '0');
-//   return `${yyyy}-${mm}-${dd}`;
-// }
-
-// function clamp(n: number, a: number, b: number) {
-//   return Math.max(a, Math.min(b, n));
-// }
-
-// // Pearson correlation (xs and ys aligned)
-// function pearson(xs: number[], ys: number[]) {
-//   const n = Math.min(xs.length, ys.length);
-//   if (n === 0) return 0;
-
-//   let sumX = 0, sumY = 0, sumXX = 0, sumYY = 0, sumXY = 0;
-//   for (let i = 0; i < n; i++) {
-//     const x = xs[i], y = ys[i];
-//     sumX += x; sumY += y;
-//     sumXX += x * x; sumYY += y * y;
-//     sumXY += x * y;
-//   }
-
-//   const num = sumXY - (sumX * sumY) / n;
-//   const den = Math.sqrt((sumXX - (sumX * sumX) / n) * (sumYY - (sumY * sumY) / n));
-//   if (den === 0) return 0;
-//   return num / den;
-// }
-
-// type HeatmapValue = { date: string; count: number };
-
-// export default function InsightsScreen({ navigation }: any) {
-
-//   const { user } = useAuth();
-
-//   const [moods, setMoods] = useState<MoodRow[]>([]);
-//   const [thoughts, setThoughts] = useState<ThoughtRow[]>([]);
-//   const [mode, setMode] = useState<'mood' | 'panic'>('mood');
-//   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
-//     function parseDayIdLocal(id: string) {
-//         const [y, m, d] = id.split('-').map(Number);
-//         return new Date(y, (m ?? 1) - 1, d ?? 1); // local midnight
-//     }
-
-//   // 365 days window (local)
-//   const endDate = useMemo(() => new Date(), []);
-//   const startMs = useMemo(() => {
-//     const d = new Date();
-//     d.setDate(d.getDate() - 364);
-//     d.setHours(0, 0, 0, 0);
-//     return d.getTime();
-//   }, []);
-  
-
-//     useEffect(() => {
-//         if (!user) return;
-
-//         // moods: orderBy + limit (Firestore pattern) [web:1354]
-//         const q = query(
-//         collection(db, 'users', user.uid, 'moods'),
-//         orderBy('updatedAt', 'desc'),
-//         limit(450)
-//         );
-
-//         const unsub = onSnapshot(q, (snap) => {
-//         const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() as MoodDoc }));
-//         // Keep only last 365 days by doc id date if possible; fallback to updatedAt
-//         const filtered = rows.filter((r) => {
-//             // prefer doc id as YYYY-MM-DD (kod tebe jeste)
-//             const d = parseDayIdLocal(r.id);
-//             return d.getTime() >= startMs;
-//         });
-//         // sort chronologically by id (YYYY-MM-DD)
-//         filtered.sort((a, b) => a.id.localeCompare(b.id));
-//         setMoods(filtered);
-//         });
-
-//         return unsub;
-//     }, [user, startMs]);
-    
-
-//   useEffect(() => {
-//     if (!user) return;
-
-//     const q = query(
-//       collection(db, 'users', user.uid, 'thoughtLogs'),
-//       orderBy('createdAt', 'desc'),
-//       limit(1200)
-//     );
-
-//     const unsub = onSnapshot(q, (snap) => {
-//       const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() as ThoughtLogDoc }));
-//       // keep only 365d
-//       const filtered = rows.filter((r) => {
-//         const ts = r.data.createdAt?.toDate?.();
-//         const ms = ts ? ts.getTime() : null;
-//         return ms == null ? true : ms >= startMs;
-//       });
-//       setThoughts(filtered);
-//     });
-
-//     return unsub;
-//   }, [user, startMs]);
-
-//   // Build moodByDay from moods
-//   const moodByDay = useMemo(() => {
-//     const m = new Map<string, number>();
-//     moods.forEach((r) => { if (typeof r.data.value === 'number') m.set(r.id, r.data.value); });
-//     return m;
-//     }, [moods]);
-
-//     const panicCountByDay = useMemo(() => {
-//     const m = new Map<string, number>();
-//     thoughts.forEach((r) => {
-//         const ts = r.data.createdAt?.toDate?.();
-//         if (!ts) return;
-//         const id = toDayIdLocal(ts);
-//         m.set(id, (m.get(id) ?? 0) + 1);
-//     });
-//     return m;
-//     }, [thoughts]);
-
-//   // Correlation using intersection of days
-//   const correlation = useMemo(() => {
-//     const xs: number[] = [];
-//     const ys: number[] = [];
-
-//     moodByDay.forEach((mood, dayId) => {
-//       const p = panicCountByDay.get(dayId);
-//       if (p == null) return;
-//       xs.push(mood);
-//       ys.push(p);
-//     });
-
-//     return {
-//       r: xs.length >= 3 ? pearson(xs, ys) : null,
-//       n: xs.length,
-//     };
-//   }, [moodByDay, panicCountByDay]);
-
-//   const heatmapValues: HeatmapValue[] = useMemo(() => {
-//     const values: HeatmapValue[] = [];
-
-//     // We only pass days that have data (library will leave blanks for others) [web:1501]
-//     if (mode === 'mood') {
-//       moodByDay.forEach((mood, dayId) => {
-//         // mood 1..5 -> bucket 0..4
-//         const count = clamp(Math.round(mood) - 1, 0, 4);
-//         if (Number.isFinite(count)) values.push({ date: dayId, count });
-//       });
-//     } else {
-//       panicCountByDay.forEach((cnt, dayId) => {
-//         const count =
-//             cnt >= 8 ? 4 :
-//             cnt >= 5 ? 3 :
-//             cnt >= 3 ? 2 : 1;
-
-//         values.push({ date: dayId, count });
-//         });
-//     }
-
-//     return values;
-//   }, [mode, moodByDay, panicCountByDay]);
-
-//   useEffect(() => {
-//   const uniq = new Set(heatmapValues.map(x => x.count));
-// //   console.log('heatmap uniq counts:', Array.from(uniq).sort(), 'samples:', heatmapValues.slice(0, 10));
-// }, [heatmapValues]);
-
-//     const moodColors = ['#532550', '#7F1D1D', '#B45309', '#15803D', '#22C55E'];
-//     // 0=no data (ili very low), 4=best mood
-
-//     const panicColors = ['#472545', '#395dc1', '#122f6d', '#F59E0B', '#EF4444'];
-//     // 0=none, 4=highest panic frequency
-
-//     const colorArray = mode === 'mood' ? moodColors : panicColors;
-
-//     const screenW = Dimensions.get('window').width;
-//     const cardPadding = 14 * 2;   // tvoj card padding levo+desno
-//     const availableW = screenW - 16 * 2 - cardPadding; // outer padding 16*2 + card padding
-//     const cols = 53; // ~ 365 days => 53 nedelje
-//     const gap = 2;
-
-//     const cell = Math.floor((availableW - gap * (cols - 1)) / cols);
-//     // clamp da ne ode previše sitno
-//     const cellSize = Math.max(4, Math.min(10, cell));
-
-
-//   return (
-//     <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1220' }} edges={['top']}>
-//     <ScrollView style={{ flex: 1, backgroundColor: '#0B1220' }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-//         <TouchableOpacity
-//                     onPress={() => navigation.goBack()}
-//                     style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#111827' }}
-//                   >
-//                     <Text style={{ color: 'white' }}>← Nazad</Text>
-//                   </TouchableOpacity>
-//       <Text style={{ color: 'white', fontSize: 22 }}>Insights</Text>
-//       <TouchableOpacity
-//   onPress={async () => {
-//     if (!user?.uid) return;
-//     await devSeedInsightsData(user.uid, 180);
-//   }}
-//   style={{ backgroundColor: '#334155', padding: 10, borderRadius: 12 }}
-// >
-//   <Text style={{ color: 'white', textAlign: 'center' }}>DEV: Seed 180 days</Text>
-// </TouchableOpacity>
-
-//       <View style={{ flexDirection: 'row', gap: 10 }}>
-//         <TouchableOpacity
-//           onPress={() => setMode('mood')}
-//           style={{ flex: 1, padding: 10, borderRadius: 12, backgroundColor: mode === 'mood' ? '#2563EB' : '#111827' }}
-//         >
-//           <Text style={{ color: 'white', textAlign: 'center' }}>Mood heatmap</Text>
-//         </TouchableOpacity>
-
-//         <TouchableOpacity
-//           onPress={() => setMode('panic')}
-//           style={{ flex: 1, padding: 10, borderRadius: 12, backgroundColor: mode === 'panic' ? '#F59E0B' : '#111827' }}
-//         >
-//           <Text style={{ color: 'white', textAlign: 'center' }}>Panic heatmap</Text>
-//         </TouchableOpacity>
-//       </View>
-
-//       <View style={{ backgroundColor: '#111827', borderRadius: 18, padding: 14, gap: 8 }}>
-//         <Text style={{ color: 'white', fontSize: 16 }}>Heatmap (365 dana)</Text>
-//         <VerticalCalendarHeatmap
-//             values={heatmapValues}
-//             colors={colorArray}
-//             emptyColor="#0F172A"
-//             cell={34}
-//             gap={6}
-//             monthsBack={12}
-//             onPressDate={(dateId) => setSelectedDate(dateId)}
-//         />
-//         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-//             <Text style={{ color: '#94A3B8' }}>Manje</Text>
-//             <View style={{ flexDirection: 'row', gap: 4 }}>
-//                 {colorArray.map((c, i) => (
-//                 <View key={i} style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: c }} />
-//                 ))}
-//             </View>
-//             <Text style={{ color: '#94A3B8' }}>Više</Text>
-//         </View>
-//         <Text style={{ color: '#94A3B8' }}>
-//         {mode === 'mood'
-//             ? 'Mood: tamnije = bolji mood (5/5).'
-//             : 'Panika: tamnije = više thought logova tog dana.'}
-//         </Text>
-//         <Text style={{ color: '#94A3B8' }}>
-//   moods={moods.length} thoughtLogs={thoughts.length} pairedDays={correlation.n}
-// </Text>
-
-//       </View>
-
-//       <View style={{ backgroundColor: '#111827', borderRadius: 18, padding: 14, gap: 6 }}>
-//         <Text style={{ color: 'white', fontSize: 16 }}>Korelacija mood ↔ panic</Text>
-//         <Text style={{ color: '#94A3B8' }}>
-//           {correlation.r == null
-//             ? `Nema dovoljno podataka (trenutno parovi dana: ${correlation.n}).`
-//             : `r=${correlation.r.toFixed(2)} (broj dana: ${correlation.n})`}
-//         </Text>
-//         {correlation.r != null && (
-//           <Text style={{ color: '#94A3B8' }}>
-//             {correlation.r <= -0.3
-//               ? 'Kad mood pada, panika često raste.'
-//               : correlation.r >= 0.3
-//                 ? 'Kad mood raste, panika često raste (proveri okidače).'
-//                 : 'Nema jasne veze (za sad).'}
-//           </Text>
-//         )}
-//       </View>
-
-//       <Modal
-//   visible={selectedDate != null}
-//   transparent
-//   animationType="fade"
-//   onRequestClose={() => setSelectedDate(null)}
-// >
-//   <TouchableOpacity
-//     activeOpacity={1}
-//     onPress={() => setSelectedDate(null)}
-//     style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 16 }}
-//   >
-//     <TouchableOpacity
-//       activeOpacity={1}
-//       onPress={() => {}}
-//       style={{ backgroundColor: '#111827', borderRadius: 16, padding: 14, gap: 10 }}
-//     >
-//       <Text style={{ color: 'white', fontSize: 18 }}>Detalji dana</Text>
-
-//       <Text style={{ color: '#94A3B8' }}>
-//         Datum: {selectedDate}
-//       </Text>
-
-//       <Text style={{ color: 'white' }}>
-//         Mood: {selectedDate ? (moodByDay.get(selectedDate) ?? '—') : '—'} / 5
-//       </Text>
-
-//       <Text style={{ color: 'white' }}>
-//         Thought logovi: {selectedDate ? (panicCountByDay.get(selectedDate) ?? 0) : 0}
-//       </Text>
-//       <TouchableOpacity onPress={() => {
-//             setSelectedDate(null);
-//             navigation.navigate('MojiLogovi', { dateId: selectedDate });
-//             }}>
-//             <Text style={{ color: 'white' }}>Otvori logove za dan</Text>
-//         </TouchableOpacity>
-
-//       <TouchableOpacity
-//         onPress={() => setSelectedDate(null)}
-//         style={{ backgroundColor: '#0F172A', borderRadius: 12, padding: 10 }}
-//       >
-//         <Text style={{ color: 'white', textAlign: 'center' }}>Zatvori</Text>
-//       </TouchableOpacity>
-      
-//     </TouchableOpacity>
-//   </TouchableOpacity>
-// </Modal>
-
-//     </ScrollView>
-//     </SafeAreaView>
-//   );
-// }
-
-
-
-///stari kod gore, radi!!!!!
-
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { VerticalCalendarHeatmap } from '../component/VerticalCalendarHeatmap';
@@ -361,7 +6,6 @@ import { db } from '../firebase/firebase';
 import { useAuth } from '../context/authContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { devSeedInsightsData } from '../utils/devSeed';
-import { Dimensions } from 'react-native';
 import { Modal } from 'react-native';
 import { PLACE_OPTIONS, SITUATION_OPTIONS } from '../constants/thoughtLogTags';
 import { useTranslation } from 'react-i18next';
@@ -624,15 +268,17 @@ export default function InsightsScreen({ navigation }: any) {
 
         <Text style={{ color: 'white', fontSize: 22 }}>{t('insights.title')}</Text>
 
-        <TouchableOpacity
-          onPress={async () => {
-            if (!user?.uid) return;
-            await devSeedInsightsData(user.uid, 180);
-          }}
-          style={{ backgroundColor: '#334155', padding: 10, borderRadius: 12 }}
-        >
-          <Text style={{ color: 'white', textAlign: 'center' }}>{t('insights.devSeed')}</Text>
-        </TouchableOpacity>
+        {__DEV__ && (
+          <TouchableOpacity
+            onPress={async () => {
+              if (!user?.uid) return;
+              await devSeedInsightsData(user.uid, 180);
+            }}
+            style={{ backgroundColor: '#334155', padding: 10, borderRadius: 12 }}
+          >
+            <Text style={{ color: 'white', textAlign: 'center' }}>{t('insights.devSeed')}</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Korelacija */}
         <View style={{ backgroundColor: '#111827', borderRadius: 18, padding: 14, gap: 6 }}>
@@ -815,9 +461,11 @@ export default function InsightsScreen({ navigation }: any) {
                 {mode === 'mood' ? t('insights.moodHeatmapHint') : t('insights.panicHeatmapHint')}
               </Text>
 
-              <Text style={{ color: '#94A3B8' }}>
-                moods={moods.length} thoughtLogs={thoughts.length} pairedDays={correlation.n}
-              </Text>
+              {__DEV__ && (
+                <Text style={{ color: '#94A3B8' }}>
+                  moods={moods.length} thoughtLogs={thoughts.length} pairedDays={correlation.n}
+                </Text>
+              )}
             </>
           )}
         </View>
@@ -868,4 +516,3 @@ export default function InsightsScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-

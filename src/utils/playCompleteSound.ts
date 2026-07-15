@@ -23,7 +23,7 @@ export async function playCompleteSound(): Promise<void> {
     );
     sound = s;
     s.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinishAndNotReset) {
+      if (status.isLoaded && status.didJustFinish) {
         s.unloadAsync().catch(() => {});
         sound = null;
       }
