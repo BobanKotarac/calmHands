@@ -1,33 +1,38 @@
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { getQuietMode } from './appSettings';
 
 // Kratak zvuk na kraju vežbe. Možeš zameniti sa require('../assets/sounds/complete.mp3') za lokalni fajl.
 const COMPLETE_SOUND_URI = 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3';
 
-let sound: Audio.Sound | null = null;
+let player: AudioPlayer | null = null;
 
 export async function playCompleteSound(): Promise<void> {
   try {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
+    if (await getQuietMode()) return;
+
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      interruptionMode: 'duckOthers',
     });
-    if (sound) {
-      await sound.unloadAsync();
-      sound = null;
+
+    if (player) {
+      player.release();
+      player = null;
     }
-    const { sound: s } = await Audio.Sound.createAsync(
-      { uri: COMPLETE_SOUND_URI },
-      { shouldPlay: true, volume: 0.6 }
-    );
-    sound = s;
-    s.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        s.unloadAsync().catch(() => {});
-        sound = null;
+
+    const next = createAudioPlayer(COMPLETE_SOUND_URI);
+    next.volume = 0.6;
+    player = next;
+
+    next.addListener('playbackStatusUpdate', (status) => {
+      if (status.didJustFinish) {
+        next.release();
+        if (player === next) player = null;
       }
     });
+
+    next.play();
   } catch {
     // ignore
   }

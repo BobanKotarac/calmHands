@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Button, Dimensions, Modal, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { moodMeta } from '../utils/moodMeta';
+import { HomeRecommendationsSection } from '../components/home/HomeRecommendationsSection';
+import { QuickActionsGrid } from '../components/ui/QuickActionsGrid';
+import { SosFab } from '../components/ui/SosFab';
+import { AppBackground } from '../components/ui/AppBackground';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../context/authContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +27,7 @@ import {
   type AchievementId,
 } from '../utils/achievements';
 import { useTranslation } from 'react-i18next';
-
-const W = Dimensions.get('window').width;
+import { onListenError } from '../utils/onListenError';
 
 type MoodDoc = {
   value: number;
@@ -47,20 +51,32 @@ type Action = 'SOS' | 'Breathing' | 'Grounding' | 'Mudras' | 'ThoughtLog' | 'Moj
 type Rec = {
   titleKey: string;
   reasonKey: string;
-  color: string;
+  accentColor: string;
   action: Action;
   params?: any;
 };
 
 const isNumber = (x: unknown): x is number => typeof x === 'number';
 
-
-function moodMeta(v: number): { emoji: string; titleKey: string; color: string } {
-  if (v <= 1) return { emoji: '😣', titleKey: 'hard', color: '#EF4444' };
-  if (v === 2) return { emoji: '😟', titleKey: 'bad', color: '#F97316' };
-  if (v === 3) return { emoji: '😐', titleKey: 'ok', color: '#60A5FA' };
-  if (v === 4) return { emoji: '🙂', titleKey: 'good', color: '#10B981' };
-  return { emoji: '😌', titleKey: 'great', color: '#22C55E' };
+function recAccent(action: Action): string {
+  switch (action) {
+    case 'SOS':
+      return theme.colors.sos;
+    case 'Breathing':
+      return theme.colors.primary;
+    case 'Grounding':
+      return theme.colors.accent;
+    case 'Mudras':
+      return theme.colors.warning;
+    case 'ThoughtLog':
+      return theme.colors.success;
+    case 'MojiLogovi':
+      return theme.colors.textMuted;
+    case 'Mood':
+      return theme.colors.primary;
+    default:
+      return theme.colors.primary;
+  }
 }
 
 function todayId() {
@@ -85,7 +101,7 @@ function daysBetween(a: Date, b: Date) {
 }
 
 export default function HomeScreen({ navigation }: any) {
-    const { user } = useAuth();
+    const { user, isGuest } = useAuth();
     const [items, setItems] = useState<Array<{ id: string; data: MoodDoc }>>([]);
     const [thoughtRows, setThoughtRows] = useState<ThoughtLogRow[]>([]);
     const [showAllRecs, setShowAllRecs] = useState(false);
@@ -95,9 +111,11 @@ export default function HomeScreen({ navigation }: any) {
     const [currentWeekId, setCurrentWeekId] = useState<string>('');
     const [lowMoodDismissed, setLowMoodDismissed] = useState(true);
     const [showNotOkayModal, setShowNotOkayModal] = useState(false);
-    const [notOkayText, setNotOkayText] = useState('');
     const { isPremium, showPaywall } = usePremiumContext();
     const { t } = useTranslation();
+
+    const goAuth = () => navigation.getParent?.('RootStack')?.navigate('Auth') ?? navigation.navigate('Auth');
+    const goPaywallOrAuth = () => (isGuest ? goAuth() : showPaywall());
 
     useEffect(() => {
         if (!user) return;
@@ -112,7 +130,7 @@ export default function HomeScreen({ navigation }: any) {
         const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() as MoodDoc }));
         rows.sort((a, b) => a.id.localeCompare(b.id)); // hronološki
         setItems(rows);
-        });
+        }, onListenError);
 
         return unsub;
     }, [user]);
@@ -129,7 +147,7 @@ export default function HomeScreen({ navigation }: any) {
         const unsub = onSnapshot(q, (snap) => {
             const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() as ThoughtLogDoc }));
             setThoughtRows(rows);
-        });
+        }, onListenError);
 
         return unsub;
     }, [user]);
@@ -236,7 +254,7 @@ export default function HomeScreen({ navigation }: any) {
         return out;
     }, [items]);
 
-    const todayColor = hasToday ? '#10B981' : '#F59E0B';
+    const todayColor = hasToday ? theme.colors.success : theme.colors.warning;
 
 
     // const thoughtLast7 = useMemo(() => {
@@ -343,40 +361,40 @@ export default function HomeScreen({ navigation }: any) {
       // 0) Novi korisnik: prvi mood
       if (items.length === 0) {
         return [
-          { titleKey: 'home.rec.first_mood_title', reasonKey: 'home.rec.first_mood_reason', color: theme.colors.primary, action: 'Mood' },
+          { titleKey: 'home.rec.first_mood_title', reasonKey: 'home.rec.first_mood_reason', accentColor: recAccent('Mood'), action: 'Mood' },
         ];
       }
 
       // 0.5) Visok rizik: uvek ponudi SOS paket
       if (riskScore >= 0.8) {
         return [
-          { titleKey: 'home.rec.acute_sos_title', reasonKey: 'home.rec.acute_sos_reason', color: '#EF4444', action: 'SOS' },
-          { titleKey: 'home.rec.then_grounding_title', reasonKey: 'home.rec.then_grounding_reason', color: '#F97316', action: 'Grounding' },
+          { titleKey: 'home.rec.acute_sos_title', reasonKey: 'home.rec.acute_sos_reason', accentColor: recAccent('SOS'), action: 'SOS' },
+          { titleKey: 'home.rec.then_grounding_title', reasonKey: 'home.rec.then_grounding_reason', accentColor: recAccent('Grounding'), action: 'Grounding' },
         ];
       }
 
       // 1) Akutno: SOS (po jakim logovima)
       if (count7 >= 3 && (panic7 != null && panic7 >= 7)) {
         return [
-          { titleKey: 'home.rec.acute_sos_title', reasonKey: 'home.rec.acute_sos_reason', color: '#EF4444', action: 'SOS' },
-          { titleKey: 'home.rec.then_grounding_title', reasonKey: 'home.rec.then_grounding_reason', color: '#F97316', action: 'Grounding' },
+          { titleKey: 'home.rec.acute_sos_title', reasonKey: 'home.rec.acute_sos_reason', accentColor: recAccent('SOS'), action: 'SOS' },
+          { titleKey: 'home.rec.then_grounding_title', reasonKey: 'home.rec.then_grounding_reason', accentColor: recAccent('Grounding'), action: 'Grounding' },
         ];
       }
 
       // 2) Srednja napetost: disanje kao primarno
       if (panic7 != null && panic7 >= 4) {
         const out: Rec[] = [
-          { titleKey: 'home.rec.tension_breathing_title', reasonKey: 'home.rec.tension_breathing_reason', color: '#3B82F6', action: 'Breathing', params: { durationSec: 180 } },
+          { titleKey: 'home.rec.tension_breathing_title', reasonKey: 'home.rec.tension_breathing_reason', accentColor: recAccent('Breathing'), action: 'Breathing', params: { durationSec: 180 } },
           {
             titleKey: 'home.rec.thoughts_grounding_title',
             reasonKey: 'home.rec.thoughts_grounding_reason',
-            color: '#0EA5E9',
+            accentColor: recAccent('Grounding'),
             action: 'Grounding',
           },
         ];
 
         if (improved7 != null && improved7 >= 2) {
-          out.push({ titleKey: 'home.rec.log_helps_title', reasonKey: 'home.rec.log_helps_reason', color: '#10B981', action: 'ThoughtLog' });
+          out.push({ titleKey: 'home.rec.log_helps_title', reasonKey: 'home.rec.log_helps_reason', accentColor: recAccent('ThoughtLog'), action: 'ThoughtLog' });
         }
         return out;
       }
@@ -384,15 +402,15 @@ export default function HomeScreen({ navigation }: any) {
       // 3) Nizak mood bez mnogo panike: rutina
       if (mood7 <= 2.5 && count7 <= 1) {
         return [
-          { titleKey: 'home.rec.low_mood_mudra_title', reasonKey: 'home.rec.low_mood_mudra_reason', color: '#F59E0B', action: 'Mudras' },
-          { titleKey: 'home.rec.preventive_breathing_title', reasonKey: 'home.rec.preventive_breathing_reason', color: '#3B82F6', action: 'Breathing', params: { durationSec: 60 } },
+          { titleKey: 'home.rec.low_mood_mudra_title', reasonKey: 'home.rec.low_mood_mudra_reason', accentColor: recAccent('Mudras'), action: 'Mudras' },
+          { titleKey: 'home.rec.preventive_breathing_title', reasonKey: 'home.rec.preventive_breathing_reason', accentColor: recAccent('Breathing'), action: 'Breathing', params: { durationSec: 60 } },
         ];
       }
 
       // 4) Fallback: upiši log
       return [
-        { titleKey: 'home.rec.write_log_title', reasonKey: 'home.rec.write_log_reason', color: '#10B981', action: 'ThoughtLog' },
-        { titleKey: 'home.rec.review_logs_title', reasonKey: 'home.rec.review_logs_reason', color: '#111827', action: 'MojiLogovi' },
+        { titleKey: 'home.rec.write_log_title', reasonKey: 'home.rec.write_log_reason', accentColor: recAccent('ThoughtLog'), action: 'ThoughtLog' },
+        { titleKey: 'home.rec.review_logs_title', reasonKey: 'home.rec.review_logs_reason', accentColor: recAccent('MojiLogovi'), action: 'MojiLogovi' },
       ];
     }, [items.length, insight.avg7, thoughtAvg7, thoughtCount7, thoughtImproveAvg7, riskScore]);
 
@@ -421,67 +439,145 @@ export default function HomeScreen({ navigation }: any) {
       setLowMoodDismissed(true);
     }, []);
 
-    const saveQuickThoughtLog = React.useCallback(async () => {
-      const text = notOkayText.trim();
-      if (!user?.uid || !text) return;
-      try {
-        await addDoc(collection(db, 'users', user.uid, 'thoughtLogs'), {
-          thoughts: text,
-          bodySensations: '',
-          createdAt: serverTimestamp(),
-        });
-      } catch (_) {}
-    }, [user?.uid, notOkayText]);
-
     const openNotOkayOption = React.useCallback(
-      async (action: 'sos' | 'plan' | 'log' | 'saveClose') => {
-        if (action === 'saveClose' && notOkayText.trim()) {
-          await saveQuickThoughtLog();
-        }
-        if (action === 'log' && notOkayText.trim()) {
-          await saveQuickThoughtLog();
-        }
+      (action: 'sos' | 'plan' | 'log') => {
         setShowNotOkayModal(false);
-        setNotOkayText('');
         if (action === 'sos') navigation.navigate('SOS');
-        else if (action === 'plan') navigation.navigate('Planovi' as any);
-        else if (action === 'log') navigation.navigate('ThoughtLog');
+        else if (action === 'plan') {
+          if (isGuest) goAuth();
+          else navigation.navigate('Planovi' as any);
+        } else if (action === 'log') {
+          if (isGuest) goAuth();
+          else navigation.navigate('ThoughtLog');
+        }
       },
-      [notOkayText, saveQuickThoughtLog, navigation]
+      [navigation, isGuest]
     );
 
+    const handleRecPress = (r: { action: string; params?: any }) => {
+      if (r.action === 'Breathing') navigation.navigate('Breathing', r.params);
+      else if (r.action === 'Mood') navigation.navigate('Mood' as any);
+      else navigation.navigate(r.action as any);
+    };
+
+    const quickActions = [
+      { key: 'breathe', label: t('home.quickBreathe'), emoji: '🌬️', onPress: () => navigation.navigate('Breathing', { durationSec: 60 }) },
+      { key: 'ground', label: t('home.quickGround'), emoji: '🌍', onPress: () => navigation.navigate('Grounding') },
+      { key: 'mudras', label: t('home.mudras'), emoji: '👐', onPress: () => navigation.navigate('Mudras') },
+      ...(isGuest
+        ? []
+        : [
+            { key: 'logs', label: t('home.myLogs'), emoji: '📝', onPress: () => navigation.navigate('MojiLogovi') },
+            ...(isPremium
+              ? [{ key: 'insights', label: t('home.insights'), emoji: '📊', onPress: () => navigation.navigate('Insights') }]
+              : [{ key: 'insights', label: t('home.insights'), emoji: '🔒', onPress: goPaywallOrAuth, accent: theme.colors.primary }]),
+          ]),
+    ];
+
     return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
-        <ScrollView contentContainerStyle={{ padding: theme.padding.screen, gap: 12, paddingBottom: 24 }}>
+    <AppBackground>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            padding: theme.padding.screen,
+            gap: theme.padding.sectionGap,
+            paddingBottom: 100,
+          }}
+        >
             {/* Hero */}
-            <View style={{ marginBottom: 8 }}>
+            <View style={{ marginBottom: 4, gap: 6 }}>
+              <Text style={[theme.typography.caption, { color: theme.colors.primary, fontFamily: theme.typography.fontSemiBold, letterSpacing: 0.6, textTransform: 'uppercase' }]}>
+                CalmHands
+              </Text>
               <Text style={[theme.typography.hero, { color: theme.colors.text }]}>
                 {t('home.welcome')}{user?.displayName ? `, ${user.displayName}` : ''}.
               </Text>
-              <Text style={{ color: theme.colors.textMuted, fontSize: 14, marginTop: 4 }}>
+              <Text style={{ color: theme.colors.textMuted, fontSize: 14, fontFamily: theme.typography.fontRegular }}>
                 {todayFormatted}
               </Text>
             </View>
 
-            {/* Trenutno mi nije dobro */}
+            {isGuest ? (
+              <TouchableOpacity
+                activeOpacity={theme.activeOpacity}
+                onPress={goAuth}
+                style={{
+                  backgroundColor: theme.colors.primaryMuted,
+                  borderRadius: theme.radius.card,
+                  padding: theme.padding.cardTight,
+                  borderWidth: 1,
+                  borderColor: theme.colors.primarySoft,
+                  gap: 4,
+                }}
+              >
+                <Text style={[theme.typography.bodySmall, { color: theme.colors.primary, fontFamily: theme.typography.fontSemiBold }]}>
+                  {t('guest.createAccount')}
+                </Text>
+                <Text style={[theme.typography.caption, { color: theme.colors.textMuted }]}>{t('guest.modeHint')}</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Support CTA — teal fill; SOS FAB stays the urgent red shortcut */}
             <TouchableOpacity
               activeOpacity={theme.activeOpacity}
               onPress={() => setShowNotOkayModal(true)}
-              style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.button, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: theme.colors.cardBorder, borderStyle: 'dashed' }}
+              style={{
+                borderRadius: theme.radius.button,
+                overflow: 'hidden',
+                elevation: 4,
+                shadowColor: theme.colors.primary,
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.35,
+                shadowRadius: 8,
+              }}
             >
-              <Text style={{ color: theme.colors.textMuted, textAlign: 'center', fontSize: 15 }}>💙 {t('home.notOkayButton')}</Text>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ paddingVertical: 16, paddingHorizontal: 18, gap: 2 }}
+              >
+                <Text
+                  style={[
+                    theme.typography.body,
+                    {
+                      color: theme.colors.onPrimary,
+                      textAlign: 'center',
+                      fontWeight: '700',
+                      fontFamily: theme.typography.fontBold,
+                      fontSize: 17,
+                    },
+                  ]}
+                >
+                  {t('home.notOkayButton')}
+                </Text>
+                <Text
+                  style={{
+                    color: theme.colors.onPrimary,
+                    opacity: 0.7,
+                    textAlign: 'center',
+                    fontSize: 13,
+                    fontFamily: theme.typography.fontRegular,
+                  }}
+                >
+                  {t('home.notOkayButtonHint')}
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* TODAY + STREAK + INSIGHT */}
-            <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.cardTight, gap: 12 }}>
+            <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.card, gap: 14, borderWidth: 1, borderColor: theme.colors.cardBorder, ...theme.shadow.card, shadowOpacity: 0.14 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={[theme.typography.sectionTitle, { color: theme.colors.text, fontSize: 16 }]}>{t('home.today')}</Text>
-                <Text style={{ color: todayColor, fontSize: 14 }}>
-                {hasToday ? `✅ ${t('home.todayEntered')}` : `⏳ ${t('home.todayNotEntered')}`}
+                <Text style={[theme.typography.sectionTitle, { color: theme.colors.text }]}>{t('home.today')}</Text>
+                <Text style={{ color: todayColor, fontSize: 13, fontFamily: theme.typography.fontSemiBold }}>
+                {hasToday ? t('home.todayEntered') : t('home.todayNotEntered')}
                 </Text>
             </View>
 
-            <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>{!items.length ? t('home.noEntryYet') : !hasToday ? t('home.todayNotEnteredLabel') : t('home.todayEnteredLabel')} {t('home.date')}: {today}.</Text>
+            <Text style={[theme.typography.bodySmall, { color: theme.colors.textMuted }]}>
+              {!items.length ? t('home.noEntryYet') : !hasToday ? t('home.todayNotEnteredLabel') : t('home.todayEnteredLabel')}
+            </Text>
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 1, backgroundColor: theme.colors.cardMuted, borderRadius: theme.radius.cardSmall, padding: 12, borderWidth: streak > 0 && streak >= ritualStreak ? 1 : 0, borderColor: theme.colors.success }}>
@@ -513,7 +609,7 @@ export default function HomeScreen({ navigation }: any) {
                 activeOpacity={theme.activeOpacity}
                 onPressIn={() => Animated.spring(ctaScale, { toValue: 0.98, useNativeDriver: true }).start()}
                 onPressOut={() => Animated.spring(ctaScale, { toValue: 1, useNativeDriver: true }).start()}
-                onPress={() => navigation.navigate('Mood')}
+                onPress={() => (isGuest ? goAuth() : navigation.navigate('Mood'))}
                 style={{ overflow: 'hidden', borderRadius: theme.radius.button }}
             >
                 <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
@@ -521,8 +617,10 @@ export default function HomeScreen({ navigation }: any) {
                     colors={[theme.colors.primary, theme.colors.primaryDark]}
                     style={{ paddingVertical: theme.padding.button, paddingHorizontal: theme.padding.screen, alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>
-                      {!hasToday && '✏️ '}{hasToday ? t('home.editMood') : t('home.enterMood')}
+                    <Text style={{ color: theme.colors.onPrimary, fontSize: 16, fontFamily: theme.typography.fontSemiBold }}>
+                      {isGuest
+                        ? t('guest.createAccount')
+                        : `${!hasToday ? '✏️ ' : ''}${hasToday ? t('home.editMood') : t('home.enterMood')}`}
                     </Text>
                   </LinearGradient>
                 </Animated.View>
@@ -530,7 +628,7 @@ export default function HomeScreen({ navigation }: any) {
             </View>
 
             {/* NEDELJNI PREGLED */}
-            {showWeeklyReviewCard && user?.uid && (
+            {!isGuest && showWeeklyReviewCard && user?.uid && (
               <TouchableOpacity
                 activeOpacity={theme.activeOpacity}
                 onPress={() => setShowWeeklyReviewModal(true)}
@@ -542,7 +640,7 @@ export default function HomeScreen({ navigation }: any) {
             )}
 
             {/* Low-mood: predlog plan + podsetnik */}
-            {showLowMoodCard && (
+            {!isGuest && showLowMoodCard && (
               <View style={{ backgroundColor: theme.colors.warning + '22', borderRadius: theme.radius.card, padding: theme.padding.cardTight, gap: 12, borderWidth: 1, borderColor: theme.colors.warning }}>
                 <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>{t('home.lowMoodSuggestionTitle')}</Text>
                 <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>{t('home.lowMoodSuggestionBody')}</Text>
@@ -578,7 +676,9 @@ export default function HomeScreen({ navigation }: any) {
                 <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
                   <Text style={{ fontSize: 48 }}>{meta.emoji}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '600' }}>{lastValue != null ? t(`mood.${meta.titleKey}`) : t('home.noEntry')}</Text>
+                    <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '600' }}>
+                      {lastValue != null ? t(`mood.${meta.titleKey}`) : t('home.noEntryYet')}
+                    </Text>
                     <Text style={{ color: theme.colors.textMuted, marginTop: 4, fontSize: 14 }}>{lastValue != null ? t('home.followTrend') : t('home.startWithFirst')}</Text>
                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 10, alignItems: 'center' }}>
                       {[1, 2, 3, 4, 5].map((n) => {
@@ -603,7 +703,7 @@ export default function HomeScreen({ navigation }: any) {
             </View>
 
             {/* TREND – strip poslednjih 7 dana, boja po moodu */}
-            <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.cardTight, gap: 10 }}>
+            <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.cardTight, gap: 10, borderWidth: 1, borderColor: theme.colors.cardBorder }}>
                 <Text style={[theme.typography.sectionTitle, { color: theme.colors.text, fontSize: 16 }]}>{t('home.trend7')}</Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 6 }}>
                     {last7DaysStrip.map(({ dayId, value, daysAgo }) => {
@@ -616,132 +716,62 @@ export default function HomeScreen({ navigation }: any) {
                                     style={{
                                         width: '100%',
                                         aspectRatio: 1,
-                                        maxWidth: 40,
+                                        maxWidth: 44,
+                                        minHeight: 44,
                                         borderRadius: theme.radius.cardSmall,
                                         backgroundColor: color,
                                         opacity: isFilled ? 1 : 0.35,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
                                     }}
-                                />
-                                <Text style={{ color: theme.colors.textMuted, fontSize: 11 }} numberOfLines={1}>{label}</Text>
+                                >
+                                  {isFilled ? (
+                                    <Text style={{ color: theme.colors.background, fontSize: 13, fontFamily: theme.typography.fontBold }}>{value}</Text>
+                                  ) : null}
+                                </View>
+                                <Text style={[theme.typography.captionSmall, { color: theme.colors.textMuted }]} numberOfLines={1}>{label}</Text>
                             </View>
                         );
                     })}
                 </View>
             </View>
 
-            {/* INSIGHTS + RECOMMENDATIONS */}
-            
-            <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.cardTight, gap: 12 }}>
-                {isPremium ? (
-                <>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={[theme.typography.sectionTitle, { color: theme.colors.text, fontSize: 16 }]}>{t('home.recommendations')}</Text>
-                    <TouchableOpacity
-                        activeOpacity={theme.activeOpacity}
-                        onPress={() => setShowAllRecs((v) => !v)}
-                        style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: theme.radius.pill, backgroundColor: theme.colors.cardMuted, borderWidth: 1, borderColor: theme.colors.cardBorder }}
-                    >
-                        <Text style={{ color: theme.colors.textMuted }}>{showAllRecs ? t('home.showOne') : t('home.showAll')}</Text>
-                    </TouchableOpacity>
-                </View>
-                <Text style={[theme.typography.caption, { color: theme.colors.textMuted }]}>{t('home.recommendationsSubtitle')}</Text>
+            {!isGuest ? (
+              <HomeRecommendationsSection
+                isPremium={isPremium}
+                recs={recs}
+                showAllRecs={showAllRecs}
+                onToggleShowAll={() => setShowAllRecs((v) => !v)}
+                onPressRec={handleRecPress}
+                onShowPaywall={goPaywallOrAuth}
+              />
+            ) : null}
 
-                {(showAllRecs ? recs : recs.slice(0, 1)).map((r, idx) => (
-                    <TouchableOpacity
-                        key={idx}
-                        activeOpacity={theme.activeOpacity}
-                        onPress={() => {
-                            if (r.action === 'Breathing') navigation.navigate('Breathing', r.params);
-                            else if (r.action === 'Mood') navigation.navigate('Mood' as any);
-                            else navigation.navigate(r.action as any);
-                        }}
-                        style={{
-                            backgroundColor: r.color,
-                            padding: theme.padding.cardTight,
-                            borderRadius: theme.radius.cardSmall,
-                            ...(idx === 0 && Platform.OS === 'android' ? { elevation: 2 } : {}),
-                            ...(idx === 0 && Platform.OS === 'ios' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 3 } : {}),
-                        }}
-                    >
-                        <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>{t(r.titleKey)}</Text>
-                        <Text style={{ color: theme.colors.text, opacity: 0.9, marginTop: 4 }}>{t(r.reasonKey)}</Text>
-                    </TouchableOpacity>
-                ))}
-                </>
-            ):(
-                <Button title={t('home.buyProRecommendations')} onPress={showPaywall} />
-            )}
+            <View style={{ gap: 8 }}>
+              <Text style={[theme.typography.sectionTitle, { color: theme.colors.text, fontSize: 16 }]}>{t('home.quickActions')}</Text>
+              <QuickActionsGrid actions={quickActions} />
             </View>
 
-            {/* QUICK ACTIONS */}
-            <View style={{ flexDirection: 'column', gap: 10 }}>
-<TouchableOpacity
-                activeOpacity={theme.activeOpacity}
-                onPress={() => navigation.navigate('SOS')}
-                style={{ overflow: 'hidden', borderRadius: theme.radius.cardSmall, borderWidth: 2, borderColor: theme.colors.sos }}
-              >
-                <LinearGradient
-                  colors={[theme.colors.sos, theme.colors.sosDark]}
-                  style={{ paddingVertical: theme.padding.button + 2, paddingHorizontal: theme.padding.screen, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>{t('home.sos')}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+            {!isGuest ? (
+              <WeeklyReviewModal
+                visible={showWeeklyReviewModal}
+                onClose={() => setShowWeeklyReviewModal(false)}
+                weekId={currentWeekId}
+                uid={user?.uid ?? ''}
+                onSaved={() => setShowWeeklyReviewCard(false)}
+                suggestionWords={suggestionWords}
+              />
+            ) : null}
 
-                <TouchableOpacity
-                    activeOpacity={theme.activeOpacity}
-                    onPress={() => navigation.navigate('Mudras')}
-                    style={{ backgroundColor: theme.colors.cardMuted, borderWidth: 1, borderColor: theme.colors.cardBorder, padding: theme.padding.button, borderRadius: theme.radius.cardSmall }}
-                >
-                    <Text style={{ color: theme.colors.text, textAlign: 'center', fontSize: 16 }}>{t('home.mudras')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    activeOpacity={theme.activeOpacity}
-                    onPress={() => navigation.navigate('MojiLogovi')}
-                    style={{ backgroundColor: theme.colors.cardMuted, borderWidth: 1, borderColor: theme.colors.cardBorder, padding: theme.padding.button, borderRadius: theme.radius.cardSmall }}
-                >
-                    <Text style={{ color: theme.colors.text, textAlign: 'center', fontSize: 16 }}>{t('home.myLogs')}</Text>
-                </TouchableOpacity>
-                {isPremium ? (
-                    <TouchableOpacity
-                        activeOpacity={theme.activeOpacity}
-                        onPress={() => navigation.navigate('Insights')}
-                        style={{ backgroundColor: theme.colors.cardMuted, borderWidth: 1, borderColor: theme.colors.cardBorder, padding: theme.padding.button, borderRadius: theme.radius.cardSmall }}
-                    >
-                        <Text style={{ color: theme.colors.text, textAlign: 'center', fontSize: 16 }}>{t('home.insights')}</Text>
-                    </TouchableOpacity>
-                ):(
-                    <Button title={t('home.buyProInsights')} onPress={showPaywall} />
-                )}
-            </View>
-
-            <WeeklyReviewModal
-              visible={showWeeklyReviewModal}
-              onClose={() => setShowWeeklyReviewModal(false)}
-              weekId={currentWeekId}
-              uid={user?.uid ?? ''}
-              onSaved={() => setShowWeeklyReviewCard(false)}
-              suggestionWords={suggestionWords}
-            />
-
-            {/* Brzi check-in: Loše mi je */}
+            {/* Support options */}
             <Modal visible={showNotOkayModal} transparent animationType="fade">
               <TouchableOpacity
                 activeOpacity={1}
-                onPress={() => { setShowNotOkayModal(false); setNotOkayText(''); }}
-                style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}
+                onPress={() => setShowNotOkayModal(false)}
+                style={{ flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'center', padding: 24 }}
               >
                 <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.card, gap: 16 }}>
                   <Text style={[theme.typography.sectionTitle, { color: theme.colors.text }]}>{t('home.notOkayModalTitle')}</Text>
-                  <TextInput
-                    placeholder={t('home.notOkayModalHint')}
-                    placeholderTextColor={theme.colors.textDim}
-                    value={notOkayText}
-                    onChangeText={setNotOkayText}
-                    multiline
-                    numberOfLines={2}
-                    style={{ backgroundColor: theme.colors.cardMuted, borderRadius: theme.radius.button, padding: 12, color: theme.colors.text, borderWidth: 1, borderColor: theme.colors.cardBorder, minHeight: 60 }}
-                  />
                   <View style={{ gap: 10 }}>
                     <TouchableOpacity
                       activeOpacity={theme.activeOpacity}
@@ -750,37 +780,42 @@ export default function HomeScreen({ navigation }: any) {
                     >
                       <Text style={{ color: theme.colors.text, textAlign: 'center', fontWeight: '600' }}>{t('home.notOkayOpenSos')}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={theme.activeOpacity}
-                      onPress={() => openNotOkayOption('plan')}
-                      style={{ backgroundColor: theme.colors.cardMuted, paddingVertical: 12, paddingHorizontal: 16, borderRadius: theme.radius.button, borderWidth: 1, borderColor: theme.colors.cardBorder }}
-                    >
-                      <Text style={{ color: theme.colors.text, textAlign: 'center' }}>{t('home.notOkayOpenPlan')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={theme.activeOpacity}
-                      onPress={() => openNotOkayOption('log')}
-                      style={{ backgroundColor: theme.colors.cardMuted, paddingVertical: 12, paddingHorizontal: 16, borderRadius: theme.radius.button, borderWidth: 1, borderColor: theme.colors.cardBorder }}
-                    >
-                      <Text style={{ color: theme.colors.text, textAlign: 'center' }}>{t('home.notOkayWriteLog')}</Text>
-                    </TouchableOpacity>
-                    {notOkayText.trim() ? (
+                    {!isGuest ? (
+                      <>
+                        <TouchableOpacity
+                          activeOpacity={theme.activeOpacity}
+                          onPress={() => openNotOkayOption('plan')}
+                          style={{ backgroundColor: theme.colors.cardMuted, paddingVertical: 12, paddingHorizontal: 16, borderRadius: theme.radius.button, borderWidth: 1, borderColor: theme.colors.cardBorder }}
+                        >
+                          <Text style={{ color: theme.colors.text, textAlign: 'center' }}>{t('home.notOkayOpenPlan')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={theme.activeOpacity}
+                          onPress={() => openNotOkayOption('log')}
+                          style={{ backgroundColor: theme.colors.cardMuted, paddingVertical: 12, paddingHorizontal: 16, borderRadius: theme.radius.button, borderWidth: 1, borderColor: theme.colors.cardBorder }}
+                        >
+                          <Text style={{ color: theme.colors.text, textAlign: 'center' }}>{t('home.notOkayWriteLog')}</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
                       <TouchableOpacity
                         activeOpacity={theme.activeOpacity}
-                        onPress={() => openNotOkayOption('saveClose')}
-                        style={{ paddingVertical: 10 }}
+                        onPress={goAuth}
+                        style={{ backgroundColor: theme.colors.primaryMuted, paddingVertical: 12, paddingHorizontal: 16, borderRadius: theme.radius.button, borderWidth: 1, borderColor: theme.colors.primarySoft }}
                       >
-                        <Text style={{ color: theme.colors.textMuted, textAlign: 'center', fontSize: 14 }}>{t('home.notOkaySaveAndClose')}</Text>
+                        <Text style={{ color: theme.colors.primary, textAlign: 'center', fontFamily: theme.typography.fontSemiBold }}>{t('guest.createAccount')}</Text>
                       </TouchableOpacity>
-                    ) : null}
+                    )}
                   </View>
-                  <TouchableOpacity activeOpacity={theme.activeOpacity} onPress={() => { setShowNotOkayModal(false); setNotOkayText(''); }} style={{ paddingVertical: 8 }}>
+                  <TouchableOpacity activeOpacity={theme.activeOpacity} onPress={() => setShowNotOkayModal(false)} style={{ paddingVertical: 8 }}>
                     <Text style={{ color: theme.colors.textMuted, textAlign: 'center', fontSize: 14 }}>{t('common.close')}</Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
               </TouchableOpacity>
             </Modal>
         </ScrollView>
+        <SosFab label={t('home.sosShort')} onPress={() => navigation.navigate('SOS')} />
     </SafeAreaView>
+    </AppBackground>
   );
 }

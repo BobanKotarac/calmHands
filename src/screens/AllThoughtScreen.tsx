@@ -9,6 +9,8 @@ import { db, auth } from '../firebase/firebase';
 import { useRoute } from '@react-navigation/native';
 import { PLACE_OPTIONS, SITUATION_OPTIONS, TIME_OF_DAY_OPTIONS } from '../constants/thoughtLogTags';
 import { useTranslation } from 'react-i18next';
+import { theme } from '../theme';
+import { onListenError } from '../utils/onListenError';
 
 
 type ThoughtLog = {
@@ -48,7 +50,7 @@ export default function MojiLogoviScreen({ navigation }: any) {
 
       if (!user) {
         setLoading(false);
-        navigation.replace('Login');
+        navigation.navigate('Auth');
         return;
       }
 
@@ -91,6 +93,9 @@ export default function MojiLogoviScreen({ navigation }: any) {
 
         setLogs(data);
         setLoading(false);
+      }, (err) => {
+        onListenError(err);
+        setLoading(false);
       });
     });
 
@@ -102,20 +107,14 @@ export default function MojiLogoviScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1220', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: 'white' }}>{t('common.loading')}</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: theme.colors.text }}>{t('common.loading')}</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1220' }} edges={['top']}>
-        <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#111827' }}
-            >
-            <Text style={{ color: 'white' }}>{t('common.back')}</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
       <FlatList
         data={logs}
         keyExtractor={(item) => item.id}

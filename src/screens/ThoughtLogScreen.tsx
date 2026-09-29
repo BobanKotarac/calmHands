@@ -19,6 +19,7 @@ import {
   type TimeOfDayTag,
 } from '../constants/thoughtLogTags';
 import { useTranslation } from 'react-i18next';
+import { theme } from '../theme';
 
 export default function ThoughtLogScreen({ navigation, route }: any) {
   usePreventScreenCapture('thought-log');
@@ -69,8 +70,14 @@ export default function ThoughtLogScreen({ navigation, route }: any) {
       });
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(t('thoughtLog.savedTitle'), t('thoughtLog.savedAlert'));
-      navigation.goBack();
+      Alert.alert(t('thoughtLog.savedTitle'), t('thoughtLog.savedAlert'), [
+        {
+          text: t('common.close'),
+          onPress: () => {
+            if (navigation.canGoBack()) navigation.goBack();
+          },
+        },
+      ]);
 
     } catch (error: any) {
       console.error('Save error:', error);
@@ -81,17 +88,9 @@ export default function ThoughtLogScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1220' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 28 }}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{ alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#111827' }}
-        >
-          <Text style={{ color: 'white' }}>{t('common.back')}</Text>
-        </TouchableOpacity>
-
-        <Text style={{ color: 'white', fontSize: 20, fontWeight: '600' }}>{t('thoughtLog.title')}</Text>
-        <Text style={{ color: '#94A3B8', lineHeight: 20 }}>
+        <Text style={[theme.typography.bodySmall, { color: theme.colors.textMuted, lineHeight: 20 }]}>
           {t('thoughtLog.subtitle')}
         </Text>
 

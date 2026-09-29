@@ -17,12 +17,14 @@ import {
   type AchievementId,
 } from '../utils/achievements';
 import { useTranslation } from 'react-i18next';
-import { changeAppLanguage } from '../i18n';
 import { theme } from '../theme';
+import { getQuietMode, setQuietMode } from '../utils/appSettings';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ScreenContainer } from '../components/ui/ScreenContainer';
+import { LanguagePicker } from '../components/ui/LanguagePicker';
 import type { TabScreenNavigationProp } from '../navigation/types';
+import { onListenError } from '../utils/onListenError';
 
 function initialLetter(email?: string | null, displayName?: string | null) {
   const s = (displayName?.trim() || email?.trim() || '?').toUpperCase();
@@ -32,7 +34,7 @@ function initialLetter(email?: string | null, displayName?: string | null) {
 export default function ProfileScreen() {
     const { user, logout, isGuest } = useAuth();
     const navigation = useNavigation<TabScreenNavigationProp>();
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [nickname, setNickname] = useState(user?.displayName ?? '');
     const [savingNick, setSavingNick] = useState(false);
     const [nickSaved, setNickSaved] = useState(false);
@@ -64,6 +66,7 @@ export default function ProfileScreen() {
         return d;
     });
     const [showPicker, setShowPicker] = useState(false);
+    const [quietMode, setQuietModeState] = useState(false);
     const [longestStreaks, setLongestStreaks] = useState<{ mood: number; ritual: number } | null>(null);
     const [achievements, setAchievements] = useState<Record<string, any>>({});
 
@@ -99,7 +102,7 @@ export default function ProfileScreen() {
             d.setHours(s.moodReminderHour, s.moodReminderMinute, 0, 0);
             setReminderTime(d);
         }
-        });
+        }, onListenError);
 
         return unsub;
     }, [user?.uid]);
@@ -117,6 +120,10 @@ export default function ProfileScreen() {
         } catch (_) {}
       })();
     }, [user?.uid]);
+
+    useEffect(() => {
+      getQuietMode().then(setQuietModeState);
+    }, []);
 
   // helper: sačuvaj u firestore
     const persistReminder = async (on: boolean, d: Date) => {
@@ -142,43 +149,32 @@ export default function ProfileScreen() {
 
                 {isGuest && (
                     <TouchableOpacity
-                        onPress={() => navigation.getParent()?.navigate('Auth')}
+                        onPress={() => (navigation as any).getParent('RootStack')?.navigate('Auth')}
                         style={{ backgroundColor: theme.colors.primary, borderRadius: theme.radius.card, padding: theme.padding.cardTight, gap: 4 }}
                     >
-                        <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>
+                        <Text style={{ color: theme.colors.onPrimary, fontSize: 16, fontFamily: theme.typography.fontSemiBold }}>
                             {t('profile.guestBannerTitle')}
                         </Text>
-                        <Text style={{ color: theme.colors.text }}>{t('profile.guestBannerDesc')}</Text>
+                        <Text style={{ color: theme.colors.onPrimary, opacity: 0.85 }}>{t('profile.guestBannerDesc')}</Text>
                     </TouchableOpacity>
                 )}
 
-                {/* JEZIK */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ color: theme.colors.textMuted }}>{t('profile.language')}</Text>
-                    <TouchableOpacity
-                        onPress={() => changeAppLanguage('sr')}
-                        style={{
-                            paddingVertical: 8,
-                            paddingHorizontal: 14,
-                            borderRadius: theme.radius.buttonSmall,
-                            backgroundColor: i18n.language === 'sr' ? theme.colors.primary : theme.colors.card,
-                        }}
-                    >
-                        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{t('profile.serbian')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => changeAppLanguage('en')}
-                        style={{
-                            paddingVertical: 8,
-                            paddingHorizontal: 14,
-                            borderRadius: theme.radius.buttonSmall,
-                            backgroundColor: i18n.language === 'en' ? theme.colors.primary : theme.colors.card,
-                        }}
-                    >
-                        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{t('profile.english')}</Text>
-                    </TouchableOpacity>
-                </View>
+                <LanguagePicker />
 
+                {isGuest ? (
+                  <>
+                    <Card>
+                      <Text style={[theme.typography.body, { color: theme.colors.textMuted }]}>{t('guest.modeHint')}</Text>
+                    </Card>
+                    <Button
+                      title={t('guest.createAccount')}
+                      variant="primary"
+                      onPress={() => (navigation as any).getParent('RootStack')?.navigate('Auth')}
+                    />
+                    <Button title={t('guest.leaveGuest')} variant="danger" onPress={logout} />
+                  </>
+                ) : (
+                  <>
                 {/* USER CARD (inicijalni avatar) */}
                 <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -236,6 +232,22 @@ export default function ProfileScreen() {
                 {nickSaved && <Text style={{ color: theme.colors.success }}>{t('profile.saved')}</Text>}
                 </View>
 
+                </Card>
+
+                <Card>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={[theme.typography.body, { color: theme.colors.text, fontFamily: theme.typography.fontSemiBold }]}>{t('profile.quietMode')}</Text>
+                    <Text style={[theme.typography.bodySmall, { color: theme.colors.textMuted }]}>{t('profile.quietModeDesc')}</Text>
+                    </View>
+                    <Switch
+                    value={quietMode}
+                    onValueChange={async (v) => {
+                        setQuietModeState(v);
+                        await setQuietMode(v);
+                    }}
+                    />
+                </View>
                 </Card>
 
                 {/* REMINDER */}
@@ -296,7 +308,7 @@ export default function ProfileScreen() {
                 </Card>
 
                 <TouchableOpacity
-                    onPress={() => navigation.getParent()?.navigate('SafetyPlanEditor')}
+                    onPress={() => (navigation as any).getParent('RootStack')?.navigate('SafetyPlanEditor')}
                     style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.card, padding: theme.padding.cardTight, borderWidth: 1, borderColor: theme.colors.cardBorder }}
                 >
                     <Text style={{ color: theme.colors.text, fontSize: 16 }}>{t('profile.safetyPlan')}</Text>
@@ -330,8 +342,8 @@ export default function ProfileScreen() {
                     )}
                 </Card>
 
-                {!isGuest && (
                     <Button title={t('profile.logout')} variant="danger" onPress={logout} />
+                  </>
                 )}
         </ScreenContainer>
     );

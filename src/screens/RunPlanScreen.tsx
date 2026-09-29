@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { RootStackParamList } from '../navigation/RootNavigation';
 import { useAuth } from '../context/authContext';
+import { theme } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RunPlan'>;
 
@@ -31,8 +32,9 @@ export default function RunPlanScreen({ navigation, route }: Props) {
         setSteps(Array.isArray(data.steps) ? data.steps : []);
         setIdx(0);
       } catch (e: any) {
-        Alert.alert('Error', e?.message ?? 'Failed to load plan');
-        navigation.goBack();
+        Alert.alert('Error', e?.message ?? 'Failed to load plan', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
       } finally {
         setLoading(false);
       }
@@ -89,14 +91,34 @@ export default function RunPlanScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#0B1220' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0B1220' },
-  title: { color: 'white', fontSize: 20, fontWeight: '800', marginBottom: 12 },
-  card: { backgroundColor: '#121A23', padding: 14, borderRadius: 12, marginBottom: 12 },
-  stepTitle: { color: '#9AA4B2', marginBottom: 6 },
-  stepKind: { color: 'white', fontSize: 18, fontWeight: '800' },
-  primaryBtn: { paddingVertical: 12, borderRadius: 10, backgroundColor: '#2D6CDF', alignItems: 'center', marginBottom: 10 },
-  primaryBtnText: { color: 'white', fontWeight: '800' },
-  secondaryBtn: { paddingVertical: 12, borderRadius: 10, backgroundColor: '#1F2A37', alignItems: 'center' },
-  secondaryBtnText: { color: 'white', fontWeight: '700' },
+  container: { flex: 1, padding: theme.padding.screen, backgroundColor: theme.colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background },
+  title: { color: theme.colors.text, fontSize: 20, fontFamily: theme.typography.fontBold, marginBottom: 12 },
+  card: {
+    backgroundColor: theme.colors.card,
+    padding: theme.padding.cardTight,
+    borderRadius: theme.radius.cardSmall,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+  },
+  stepTitle: { color: theme.colors.textMuted, marginBottom: 6 },
+  stepKind: { color: theme.colors.text, fontSize: 18, fontFamily: theme.typography.fontBold },
+  primaryBtn: {
+    paddingVertical: 14,
+    borderRadius: theme.radius.button,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  primaryBtnText: { color: theme.colors.onPrimary, fontFamily: theme.typography.fontBold },
+  secondaryBtn: {
+    paddingVertical: 14,
+    borderRadius: theme.radius.button,
+    backgroundColor: theme.colors.card,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+  },
+  secondaryBtnText: { color: theme.colors.text, fontFamily: theme.typography.fontSemiBold },
 });

@@ -73,8 +73,9 @@ export default function PlanEditorScreen({ navigation, route }: Props) {
       const ref = doc(db, 'users', uid, 'ritualPlans', planId);
       const snap = await getDoc(ref);
       if (!snap.exists()) {
-        Alert.alert('Not found', 'Plan does not exist.');
-        navigation.goBack();
+        Alert.alert('Not found', 'Plan does not exist.', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
         return;
       }
       const data = snap.data() as any;

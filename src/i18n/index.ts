@@ -13,6 +13,27 @@ export const resources = {
 
 export type SupportedLocale = 'sr' | 'en';
 
+function getDeviceLocale(): SupportedLocale {
+  try {
+    const tag = Localization.getLocales()[0]?.languageTag ?? 'en';
+    if (tag.startsWith('sr') || tag.startsWith('sh') || tag.startsWith('bs')) return 'sr';
+  } catch {}
+  return 'en';
+}
+
+/** Sync bootstrap so useTranslation never sees a missing instance. */
+if (!i18n.isInitialized) {
+  i18n.use(initReactI18next).init({
+    resources,
+    lng: getDeviceLocale(),
+    fallbackLng: 'en',
+    defaultNS,
+    interpolation: { escapeValue: false },
+    compatibilityJSON: 'v4',
+    initImmediate: false,
+  });
+}
+
 export async function getStoredLanguage(): Promise<SupportedLocale | null> {
   try {
     const lang = await AsyncStorage.getItem(LANGUAGE_KEY);
@@ -27,24 +48,12 @@ export async function setStoredLanguage(locale: SupportedLocale): Promise<void> 
   await AsyncStorage.setItem(LANGUAGE_KEY, locale);
 }
 
-function getDeviceLocale(): SupportedLocale {
-  const tag = Localization.getLocales()[0]?.languageTag ?? 'en';
-  if (tag.startsWith('sr') || tag.startsWith('sh') || tag.startsWith('bs')) return 'sr';
-  return 'en';
-}
-
+/** Apply stored language preference (after sync bootstrap). */
 export async function initI18n(): Promise<void> {
   const stored = await getStoredLanguage();
-  const device = getDeviceLocale();
-  const lng = stored ?? device;
-
-  await i18n.use(initReactI18next).init({
-    resources,
-    lng,
-    fallbackLng: 'en',
-    defaultNS,
-    interpolation: { escapeValue: false },
-  });
+  if (stored && stored !== i18n.language) {
+    await i18n.changeLanguage(stored);
+  }
 }
 
 export function changeAppLanguage(locale: SupportedLocale): void {

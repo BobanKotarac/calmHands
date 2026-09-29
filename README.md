@@ -4,31 +4,65 @@ CalmHands is a React Native (Expo) mobile app for managing anxiety, urges, and d
 
 ## What it does
 
-- **Mood tracking** — log daily mood entries, view streaks, and see trends on a calendar heatmap.
-- **SOS support** — a fast-access screen with grounding exercises and breathing techniques for moments of acute stress or anxiety.
-- **Mudras** — guided hand mudra practices for calming and focus.
-- **Thought log** — record and tag thoughts, with export to CSV for sharing with a therapist or for personal review.
-- **Safety plan** — a personal, editable safety plan for high-risk moments.
-- **Ritual plans** — build and run custom routines/rituals, with streak tracking.
-- **Insights & weekly reflection** — charts and summaries (top triggers, weekly review) to help spot patterns over time.
-- **Reminders & notifications** — local reminders to encourage consistent check-ins.
-- **Localization** — multi-language support via i18next.
-- **Accounts & premium** — Firebase-backed auth and a premium tier via context providers.
+- **Mood tracking** — log daily mood entries, view streaks, and see 7/14-day trends.
+- **SOS support** — fast-access breathing, grounding (5–4–3–2–1), mudras, and safety plan.
+- **Physiological Sigh** — Huberman-style double-inhale breathing pattern (plus box / 4–7–8 / long exhale).
+- **Thought log** — record and tag thoughts; history and insights for registered users.
+- **Safety plan** — personal, editable plan for high-risk moments.
+- **Ritual plans** — custom routines with streak tracking (account required; Pro for unlimited).
+- **Insights & weekly reflection** — charts and summaries to spot patterns (Pro).
+- **Reminders & notifications** — local reminders for mood check-ins.
+- **Localization** — English + Serbian (i18next).
+- **Guest vs account** — guests can try SOS tools; mood logging, plans, logs, and insights need an account.
+- **Premium (RevenueCat)** — Pro entitlement wired for TestFlight; store products can be connected later. See [docs/REVENUECAT.md](docs/REVENUECAT.md).
 
 ## Tech stack
 
-- [Expo](https://expo.dev) / React Native
+- [Expo](https://expo.dev) SDK 57 / React Native
 - TypeScript
 - React Navigation (bottom tabs + native stack)
-- Firebase (auth/backend)
-- AsyncStorage / Expo SecureStore for local persistence
-- react-native-chart-kit for charts, react-native-svg, Lottie, expo-av for animations/audio
+- Firebase Auth + Firestore
+- RevenueCat (`react-native-purchases`) for subscriptions
+- AsyncStorage / Expo SecureStore
+- expo-audio, Lottie, react-native-svg / chart-kit
 
 ## Getting started
 
 ```bash
+cp .env.example .env   # fill Firebase (+ optional RevenueCat keys)
 npm install
-npm start        # or: npm run ios / npm run android / npm run web
+npm start              # Expo Go for most UI
 ```
 
-Requires the [Expo CLI](https://docs.expo.dev/get-started/installation/) and a simulator/device to run on.
+**Purchases / TestFlight:** Expo Go cannot buy. Use an EAS build:
+
+```bash
+eas build --platform ios --profile production
+eas submit --platform ios
+```
+
+Optional RevenueCat keys in `.env`:
+
+```
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=
+```
+
+Until store products are linked, you can grant Pro manually with Firestore `users/{uid}.isPremium = true`.
+
+## Guest access (summary)
+
+| Feature | Guest | Account |
+|--------|-------|---------|
+| Breathing / Grounding / Mudras / SOS | ✅ | ✅ |
+| Mood log | ❌ | ✅ |
+| Plans / thought logs / insights / safety plan | ❌ | ✅ (Pro where noted) |
+
+## Scripts
+
+```bash
+npm start
+npm run start:clean    # clear Metro cache
+npm run start:phone    # LAN with local IP
+npm test
+```

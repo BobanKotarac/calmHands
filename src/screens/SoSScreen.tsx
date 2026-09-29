@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/authContext';
 import { getSafetyPlan, type SafetyPlanDoc } from '../utils/safetyPlan';
 import { theme } from '../theme';
+import { AppBackground } from '../components/ui/AppBackground';
 
 export default function SOSSustainScreen({ navigation }: any) {
   usePreventScreenCapture('sos');
@@ -36,9 +37,10 @@ export default function SOSSustainScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+    <AppBackground>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: 24, paddingBottom: 40, gap: 24 }}
+        contentContainerStyle={{ padding: theme.padding.screen, paddingBottom: 48, gap: 24 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -125,7 +127,7 @@ export default function SOSSustainScreen({ navigation }: any) {
             onPress={() =>
               onPress('Breathing', {
                 haptic: Haptics.ImpactFeedbackStyle.Medium,
-                params: { durationSec: 60, source: 'sos' },
+                params: { durationSec: 60, patternId: 'physioSigh', source: 'sos' },
               })
             }
             style={{ overflow: 'hidden', borderRadius: theme.radius.card }}
@@ -207,5 +209,6 @@ export default function SOSSustainScreen({ navigation }: any) {
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
+    </AppBackground>
   );
 }

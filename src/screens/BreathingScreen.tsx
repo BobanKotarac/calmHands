@@ -9,10 +9,21 @@ import { useAuth } from '../context/authContext';
 import { unlockAchievement } from '../utils/achievements';
 import { playCompleteSound } from '../utils/playCompleteSound';
 import { theme } from '../theme';
+import { AppBackground } from '../components/ui/AppBackground';
 
-type PhaseKey = 'inhale' | 'hold1' | 'exhale' | 'hold2';
+type PhaseKey = 'inhale' | 'inhale2' | 'hold1' | 'exhale' | 'hold2';
 
 type PhaseDef = { key: PhaseKey; labelKey: string; seconds: number; targetScale: number };
+
+/**
+ * Huberman physiological sigh — fastest acute stress down-regulation.
+ * Full inhale → second short “top-off” inhale → long exhale to empty (~10s / cycle).
+ */
+const PHYSIO_SIGH_PHASES: PhaseDef[] = [
+  { key: 'inhale', labelKey: 'breathing.phaseInhale', seconds: 2, targetScale: 1.16 },
+  { key: 'inhale2', labelKey: 'breathing.phaseInhaleAgain', seconds: 1, targetScale: 1.28 },
+  { key: 'exhale', labelKey: 'breathing.phaseExhaleLong', seconds: 7, targetScale: 0.78 },
+];
 
 const BOX_PHASES: PhaseDef[] = [
   { key: 'inhale', labelKey: 'breathing.phaseInhale', seconds: 4, targetScale: 1.22 },
@@ -34,12 +45,35 @@ const LONG_EXHALE_PHASES: PhaseDef[] = [
   { key: 'exhale', labelKey: 'breathing.phaseExhale', seconds: 6, targetScale: 0.82 },
 ];
 
-const PATTERN_LABELS: readonly string[] = ['breathing.patternBox', 'breathing.patternCalm', 'breathing.patternLongExhale'];
-
 const PATTERNS = [
-  { id: 'box', descKey: 'breathing.descBox', phases: BOX_PHASES },
-  { id: 'calm', descKey: 'breathing.descCalm', phases: CALM_PHASES },
-  { id: 'longExhale', descKey: 'breathing.descLongExhale', phases: LONG_EXHALE_PHASES },
+  {
+    id: 'physioSigh',
+    labelKey: 'breathing.patternPhysioSigh',
+    labelFallback: { sr: 'Fiziološki uzdah', en: 'Physiological Sigh' },
+    descKey: 'breathing.descPhysioSigh',
+    phases: PHYSIO_SIGH_PHASES,
+  },
+  {
+    id: 'box',
+    labelKey: 'breathing.patternBox',
+    labelFallback: { sr: 'Kutija 4–4–4–4', en: 'Box 4–4–4–4' },
+    descKey: 'breathing.descBox',
+    phases: BOX_PHASES,
+  },
+  {
+    id: 'calm',
+    labelKey: 'breathing.patternCalm',
+    labelFallback: { sr: 'Smirivanje 4–7–8', en: 'Calming 4–7–8' },
+    descKey: 'breathing.descCalm',
+    phases: CALM_PHASES,
+  },
+  {
+    id: 'longExhale',
+    labelKey: 'breathing.patternLongExhale',
+    labelFallback: { sr: 'Dugi izdah 4–2–6', en: 'Long exhale 4–2–6' },
+    descKey: 'breathing.descLongExhale',
+    phases: LONG_EXHALE_PHASES,
+  },
 ] as const;
 
 const DURATIONS = [30, 60, 120, 180, 300] as const;
@@ -52,13 +86,27 @@ const formatMMSS = (totalSeconds: number) => {
 };
 
 export default function BreathingScreen({ navigation, route }: any) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = (i18n.language?.startsWith('sr') ? 'sr' : 'en') as 'sr' | 'en';
+
+  const patternLabel = (idx: number) => {
+    const p = PATTERNS[idx];
+    const translated = t(p.labelKey);
+    if (!translated || translated === p.labelKey) return p.labelFallback[lang];
+    return translated;
+  };
   const initialDuration = (route?.params?.durationSec as number) ?? 60;
-  const [patternIndex, setPatternIndex] = useState(0);
+  const initialPattern = (() => {
+    const id = route?.params?.patternId as string | undefined;
+    if (!id) return 0; // physiological sigh first
+    const idx = PATTERNS.findIndex((p) => p.id === id);
+    return idx >= 0 ? idx : 0;
+  })();
+  const [patternIndex, setPatternIndex] = useState(initialPattern);
   const [durationSec, setDurationSec] = useState(initialDuration);
   const [running, setRunning] = useState(true);
   const [phaseIndex, setPhaseIndex] = useState(0);
-  const [remaining, setRemaining] = useState(PATTERNS[0].phases[0].seconds);
+  const [remaining, setRemaining] = useState(PATTERNS[initialPattern].phases[0].seconds);
   const [totalRemaining, setTotalRemaining] = useState(durationSec);
   const [showSuccess, setShowSuccess] = useState(false);
   const { user } = useAuth();
@@ -197,7 +245,8 @@ export default function BreathingScreen({ navigation, route }: any) {
   }, [durationSec, totalRemaining]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+    <AppBackground>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <View style={{ flex: 1, padding: theme.padding.screen, gap: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <TouchableOpacity
@@ -209,21 +258,20 @@ export default function BreathingScreen({ navigation, route }: any) {
           >
             <Text style={{ color: theme.colors.text }}>{t('common.back')}</Text>
           </TouchableOpacity>
-          <Text style={{ color: theme.colors.text, fontSize: 18 }}>{t('breathing.title')}</Text>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontFamily: theme.typography.fontSemiBold }}>{t('breathing.title')}</Text>
           <View style={{ width: 70 }} />
         </View>
 
-        <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
+        <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
           {t(PATTERNS[patternIndex].descKey)}
         </Text>
 
-        {/* Pattern selector */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {PATTERNS.map((_, idx) => {
+          {PATTERNS.map((p, idx) => {
             const active = idx === patternIndex;
             return (
               <TouchableOpacity
-                key={idx}
+                key={p.id}
                 onPress={async () => {
                   try { await Haptics.selectionAsync(); } catch {}
                   reset(durationSec, idx);
@@ -238,14 +286,13 @@ export default function BreathingScreen({ navigation, route }: any) {
                 }}
               >
                 <Text style={{ color: active ? theme.colors.primary : theme.colors.textMuted, fontWeight: active ? '600' : '400' }}>
-                  {t(PATTERN_LABELS[idx])}
+                  {patternLabel(idx)}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Duration chips */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
           {DURATIONS.map((d) => {
             const active = d === durationSec;
@@ -290,8 +337,8 @@ export default function BreathingScreen({ navigation, route }: any) {
               marginBottom: 20,
             }}
           >
-            <Text style={{ color: theme.colors.textMuted, fontSize: 16 }}>{t(phase.labelKey)}</Text>
-            <Text style={{ color: theme.colors.text, fontSize: 52, fontVariant: ['tabular-nums'] as any }}>
+            <Text style={{ color: theme.colors.textMuted, fontSize: 15, marginBottom: 4 }}>{t(phase.labelKey)}</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 52, fontVariant: ['tabular-nums'] as any, fontFamily: theme.typography.fontBold }}>
               {remaining}
             </Text>
           </Animated.View>
@@ -306,15 +353,15 @@ export default function BreathingScreen({ navigation, route }: any) {
               try { await Haptics.selectionAsync(); } catch {}
               setRunning((r) => !r);
             }}
-            style={{ flex: 1, backgroundColor: theme.colors.card, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.cardBorder }}
+            style={{ flex: 1, backgroundColor: theme.colors.card, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.cardBorder }}
           >
-            <Text style={{ color: theme.colors.text, textAlign: 'center' }}>{running ? t('breathing.pause') : t('breathing.resume')}</Text>
+            <Text style={{ color: theme.colors.text, textAlign: 'center', fontFamily: theme.typography.fontSemiBold }}>{running ? t('breathing.pause') : t('breathing.resume')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => reset()}
-            style={{ flex: 1, backgroundColor: theme.colors.primary, padding: 12, borderRadius: 14 }}
+            style={{ flex: 1, backgroundColor: theme.colors.primary, padding: 14, borderRadius: 14 }}
           >
-            <Text style={{ color: theme.colors.text, textAlign: 'center' }}>{t('breathing.repeat')} {format(durationSec)}</Text>
+            <Text style={{ color: theme.colors.onPrimary, textAlign: 'center', fontFamily: theme.typography.fontSemiBold }}>{t('breathing.repeat')} {format(durationSec)}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -334,5 +381,6 @@ export default function BreathingScreen({ navigation, route }: any) {
         </View>
       </Modal>
     </SafeAreaView>
+    </AppBackground>
   );
 }

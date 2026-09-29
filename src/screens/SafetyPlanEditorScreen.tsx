@@ -20,6 +20,7 @@ import {
   type SafetyPlanContact,
 } from '../utils/safetyPlan';
 import { useTranslation } from 'react-i18next';
+import { theme } from '../theme';
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -56,11 +57,11 @@ export default function SafetyPlanEditorScreen({ navigation }: any) {
         setCrisisPhone('');
       }
     } catch (e: any) {
-      Alert.alert('Greška', e?.message ?? 'Nije moguće učitati plan.');
+      Alert.alert(t('safetyPlan.errorTitle'), e?.message ?? t('safetyPlan.errorAlert'));
     } finally {
       setLoading(false);
     }
-  }, [user?.uid]);
+  }, [user?.uid, t]);
 
   useEffect(() => {
     load();
@@ -90,10 +91,21 @@ export default function SafetyPlanEditorScreen({ navigation }: any) {
     setContacts((c) => c.filter((x) => x.id !== id));
   };
 
+  const leave = useCallback(() => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('Tabs');
+  }, [navigation]);
+
   const onSave = async () => {
     if (!user?.uid) return;
     const stepsValid = steps.map((s, i) => ({ ...s, order: i })).filter((s) => s.label.trim());
-    if (stepsValid.length === 0 && contacts.length === 0 && !whatHelps.trim() && !selfObservation.trim() && !crisisPhone.trim()) {
+    if (
+      stepsValid.length === 0 &&
+      contacts.length === 0 &&
+      !whatHelps.trim() &&
+      !selfObservation.trim() &&
+      !crisisPhone.trim()
+    ) {
       Alert.alert(t('safetyPlan.emptyTitle'), t('safetyPlan.emptyAlert'));
       return;
     }
@@ -106,8 +118,10 @@ export default function SafetyPlanEditorScreen({ navigation }: any) {
         selfObservation: selfObservation.trim() || undefined,
         crisisPhone: crisisPhone.trim() || undefined,
       });
-      Alert.alert(t('safetyPlan.savedTitle'), t('safetyPlan.savedAlert'));
-      navigation.goBack();
+      // goBack only after Alert dismiss — Alert + immediate goBack leaves a black overlay on iOS
+      Alert.alert(t('safetyPlan.savedTitle'), t('safetyPlan.savedAlert'), [
+        { text: t('common.close'), onPress: leave },
+      ]);
     } catch (e: any) {
       Alert.alert(t('safetyPlan.errorTitle'), e?.message ?? t('safetyPlan.errorAlert'));
     } finally {
@@ -117,133 +131,129 @@ export default function SafetyPlanEditorScreen({ navigation }: any) {
 
   if (!user?.uid) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <Text style={styles.title}>{t('safetyPlan.notLoggedIn')}</Text>
+        <TouchableOpacity onPress={leave} style={styles.backFallback}>
+          <Text style={styles.backFallbackText}>{t('common.back')}</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <Text style={styles.muted}>{t('common.loading')}</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>{t('common.back')}</Text>
-        </TouchableOpacity>
+          <Text style={styles.subtitle}>{t('safetyPlan.subtitle')}</Text>
 
-        <Text style={styles.title}>{t('safetyPlan.title')}</Text>
-        <Text style={styles.subtitle}>
-          {t('safetyPlan.subtitle')}
-        </Text>
+          <Text style={styles.sectionTitle}>{t('safetyPlan.whatHelps')}</Text>
+          <TextInput
+            value={whatHelps}
+            onChangeText={setWhatHelps}
+            placeholder={t('safetyPlan.whatHelpsPlaceholder')}
+            placeholderTextColor={theme.colors.textDim}
+            style={[styles.input, styles.inputMultiline]}
+            multiline
+          />
 
-        <Text style={styles.sectionTitle}>{t('safetyPlan.whatHelps')}</Text>
-        <TextInput
-          value={whatHelps}
-          onChangeText={setWhatHelps}
-          placeholder={t('safetyPlan.whatHelpsPlaceholder')}
-          placeholderTextColor="#64748B"
-          style={[styles.input, styles.inputMultiline]}
-          multiline
-        />
+          <Text style={styles.sectionTitle}>{t('safetyPlan.selfObservation')}</Text>
+          <TextInput
+            value={selfObservation}
+            onChangeText={setSelfObservation}
+            placeholder={t('safetyPlan.selfObservationPlaceholder')}
+            placeholderTextColor={theme.colors.textDim}
+            style={[styles.input, styles.inputMultiline]}
+            multiline
+          />
 
-        <Text style={styles.sectionTitle}>{t('safetyPlan.selfObservation')}</Text>
-        <TextInput
-          value={selfObservation}
-          onChangeText={setSelfObservation}
-          placeholder={t('safetyPlan.selfObservationPlaceholder')}
-          placeholderTextColor="#64748B"
-          style={[styles.input, styles.inputMultiline]}
-          multiline
-        />
+          <Text style={styles.sectionTitle}>{t('safetyPlan.crisisPhone')}</Text>
+          <TextInput
+            value={crisisPhone}
+            onChangeText={setCrisisPhone}
+            placeholder={t('safetyPlan.crisisPhonePlaceholder')}
+            placeholderTextColor={theme.colors.textDim}
+            style={styles.input}
+            keyboardType="phone-pad"
+          />
 
-        <Text style={styles.sectionTitle}>{t('safetyPlan.crisisPhone')}</Text>
-        <TextInput
-          value={crisisPhone}
-          onChangeText={setCrisisPhone}
-          placeholder={t('safetyPlan.crisisPhonePlaceholder')}
-          placeholderTextColor="#64748B"
-          style={styles.input}
-          keyboardType="phone-pad"
-        />
+          <Text style={styles.sectionTitle}>{t('safetyPlan.stepsTitle')}</Text>
+          {steps.map((step, idx) => (
+            <View key={step.id} style={styles.row}>
+              <Text style={styles.orderLabel}>{idx + 1}.</Text>
+              <TextInput
+                value={step.label}
+                onChangeText={(txt) => updateStep(step.id, txt)}
+                placeholder={t('safetyPlan.stepPlaceholder')}
+                placeholderTextColor={theme.colors.textDim}
+                style={styles.input}
+              />
+              <TouchableOpacity onPress={() => removeStep(step.id)} style={styles.removeBtn} hitSlop={8}>
+                <Text style={styles.removeBtnText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity onPress={addStep} style={styles.addBtn}>
+            <Text style={styles.addBtnText}>{t('safetyPlan.addStep')}</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>{t('safetyPlan.stepsTitle')}</Text>
-        {steps.map((step, idx) => (
-          <View key={step.id} style={styles.row}>
-            <Text style={styles.orderLabel}>{idx + 1}.</Text>
-            <TextInput
-              value={step.label}
-              onChangeText={(txt) => updateStep(step.id, txt)}
-              placeholder={t('safetyPlan.stepPlaceholder')}
-              placeholderTextColor="#64748B"
-              style={styles.input}
-            />
-            <TouchableOpacity onPress={() => removeStep(step.id)} style={styles.removeBtn}>
-              <Text style={styles.removeBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-        <TouchableOpacity onPress={addStep} style={styles.addBtn}>
-          <Text style={styles.addBtnText}>{t('safetyPlan.addStep')}</Text>
-        </TouchableOpacity>
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('safetyPlan.personToHelpTitle')}</Text>
+          <Text style={styles.muted}>{t('safetyPlan.personToHelpDesc')}</Text>
+          {contacts.map((c) => (
+            <View key={c.id} style={styles.contactCard}>
+              <TextInput
+                value={c.name}
+                onChangeText={(txt) => updateContact(c.id, { name: txt })}
+                placeholder={t('safetyPlan.name')}
+                placeholderTextColor={theme.colors.textDim}
+                style={styles.input}
+              />
+              <TextInput
+                value={c.phone ?? ''}
+                onChangeText={(txt) => updateContact(c.id, { phone: txt })}
+                placeholder={t('safetyPlan.phone')}
+                placeholderTextColor={theme.colors.textDim}
+                style={styles.input}
+                keyboardType="phone-pad"
+              />
+              <TextInput
+                value={c.role ?? ''}
+                onChangeText={(txt) => updateContact(c.id, { role: txt })}
+                placeholder={t('safetyPlan.role')}
+                placeholderTextColor={theme.colors.textDim}
+                style={styles.input}
+              />
+              <TouchableOpacity onPress={() => removeContact(c.id)} style={styles.removeBtn}>
+                <Text style={styles.removeBtnText}>{t('safetyPlan.remove')}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity onPress={addContact} style={styles.addBtn}>
+            <Text style={styles.addBtnText}>{t('safetyPlan.addContact')}</Text>
+          </TouchableOpacity>
 
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('safetyPlan.personToHelpTitle')}</Text>
-        <Text style={styles.muted}>{t('safetyPlan.personToHelpDesc')}</Text>
-        {contacts.map((c) => (
-          <View key={c.id} style={styles.contactCard}>
-            <TextInput
-              value={c.name}
-              onChangeText={(txt) => updateContact(c.id, { name: txt })}
-              placeholder={t('safetyPlan.name')}
-              placeholderTextColor="#64748B"
-              style={styles.input}
-            />
-            <TextInput
-              value={c.phone ?? ''}
-              onChangeText={(txt) => updateContact(c.id, { phone: txt })}
-              placeholder={t('safetyPlan.phone')}
-              placeholderTextColor="#64748B"
-              style={styles.input}
-              keyboardType="phone-pad"
-            />
-            <TextInput
-              value={c.role ?? ''}
-              onChangeText={(txt) => updateContact(c.id, { role: txt })}
-              placeholder={t('safetyPlan.role')}
-              placeholderTextColor="#64748B"
-              style={styles.input}
-            />
-            <TouchableOpacity onPress={() => removeContact(c.id)} style={styles.removeBtn}>
-              <Text style={styles.removeBtnText}>{t('safetyPlan.remove')}</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-        <TouchableOpacity onPress={addContact} style={styles.addBtn}>
-          <Text style={styles.addBtnText}>{t('safetyPlan.addContact')}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={onSave}
-          disabled={saving}
-          style={[styles.saveBtn, saving && styles.btnDisabled]}
-        >
-          <Text style={styles.saveBtnText}>{saving ? t('safetyPlan.saving') : t('safetyPlan.savePlan')}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onSave}
+            disabled={saving}
+            style={[styles.saveBtn, saving && styles.btnDisabled]}
+          >
+            <Text style={styles.saveBtnText}>{saving ? t('safetyPlan.saving') : t('safetyPlan.savePlan')}</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -251,38 +261,60 @@ export default function SafetyPlanEditorScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B1220' },
-  scroll: { padding: 16, paddingBottom: 120 },
-  backBtn: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, marginBottom: 12 },
-  backBtnText: { color: '#94A3B8' },
-  title: { color: 'white', fontSize: 22, fontWeight: '700' },
-  subtitle: { color: '#94A3B8', marginTop: 6, lineHeight: 20 },
-  sectionTitle: { color: 'white', fontSize: 16, fontWeight: '600', marginTop: 12 },
-  muted: { color: '#64748B', fontSize: 12, marginTop: 4 },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  scroll: { padding: theme.padding.screen, paddingBottom: 120, gap: 4 },
+  title: { color: theme.colors.text, fontSize: 22, fontWeight: '700', padding: 16 },
+  subtitle: { color: theme.colors.textMuted, marginBottom: 8, lineHeight: 20 },
+  sectionTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '600', marginTop: 12 },
+  muted: { color: theme.colors.textDim, fontSize: 12, marginTop: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  orderLabel: { color: '#94A3B8', width: 24 },
+  orderLabel: { color: theme.colors.textMuted, width: 24 },
   input: {
     flex: 1,
-    backgroundColor: '#111827',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cardMuted,
+    borderRadius: theme.radius.button,
     padding: 12,
-    color: 'white',
+    color: theme.colors.text,
     borderWidth: 1,
-    borderColor: '#1F2937',
+    borderColor: theme.colors.cardBorder,
   },
   removeBtn: { padding: 8 },
-  removeBtnText: { color: '#F87171' },
+  removeBtnText: { color: theme.colors.sos },
   addBtn: {
-    backgroundColor: '#1F2937',
+    backgroundColor: theme.colors.card,
     padding: 12,
-    borderRadius: 12,
+    borderRadius: theme.radius.button,
     alignItems: 'center',
     marginTop: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
   },
-  addBtnText: { color: '#94A3B8', fontWeight: '600' },
-  contactCard: { backgroundColor: '#111827', borderRadius: 14, padding: 12, gap: 8, marginTop: 8 },
+  addBtnText: { color: theme.colors.textMuted, fontWeight: '600' },
+  contactCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.cardSmall,
+    padding: 12,
+    gap: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+  },
   inputMultiline: { minHeight: 70, textAlignVertical: 'top' },
-  saveBtn: { backgroundColor: '#3B82F6', padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 24 },
-  saveBtnText: { color: 'white', fontWeight: '700' },
+  saveBtn: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: theme.radius.button,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  saveBtnText: { color: theme.colors.background, fontWeight: '700' },
   btnDisabled: { opacity: 0.6 },
+  backFallback: {
+    margin: 16,
+    padding: 12,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.button,
+    alignItems: 'center',
+  },
+  backFallbackText: { color: theme.colors.text },
 });

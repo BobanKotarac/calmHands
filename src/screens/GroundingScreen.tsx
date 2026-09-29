@@ -1,11 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/authContext';
 import { logRitualEvent } from '../utils/ritualPlans';
 import { unlockAchievement } from '../utils/achievements';
-
+import { theme } from '../theme';
+import { AppBackground } from '../components/ui/AppBackground';
+import { StackHeader } from '../components/ui/StackHeader';
+import { Button } from '../components/ui/Button';
 
 type Step = { k: string; title: string; prompt: string; lines: number };
 
@@ -18,17 +21,18 @@ const STEPS: Step[] = [
 ];
 
 export default function GroundingScreen({ navigation, route }: any) {
-    const { user } = useAuth();
+  const { t } = useTranslation();
+  const { user } = useAuth();
   const source = route?.params?.source;
   const planId = route?.params?.planId ?? null;
   const [i, setI] = useState(0);
+  const [answers, setAnswers] = useState<string[]>(Array(STEPS.length).fill(''));
 
   React.useEffect(() => {
     if (source === 'sos' && user?.uid) {
       unlockAchievement(user.uid, 'sos_first').catch(() => {});
     }
   }, [source, user?.uid]);
-  const [answers, setAnswers] = useState<string[]>(Array(STEPS.length).fill(''));
 
   const step = STEPS[i];
   const done = i === STEPS.length - 1;
@@ -42,53 +46,72 @@ export default function GroundingScreen({ navigation, route }: any) {
   };
 
   const next = async () => {
-    try { await Haptics.selectionAsync(); } catch {}
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
     if (!done) setI((x) => x + 1);
     else {
-  try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
 
-  try {
-    if (user?.uid) {
-      await logRitualEvent(user.uid, {
-        stepType: 'grounding',
-        planId,
-        source,
-      });
+      try {
+        if (user?.uid) {
+          await logRitualEvent(user.uid, {
+            stepType: 'grounding',
+            planId,
+            source,
+          });
+        }
+      } catch {}
+
+      navigation.goBack();
     }
-  } catch {}
-
-  navigation.goBack();
-}
   };
 
   const back = async () => {
-    try { await Haptics.selectionAsync(); } catch {}
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
     if (i > 0) setI((x) => x - 1);
     else navigation.goBack();
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1220' }} edges={['top']}>
-      <View style={{ flex: 1, padding: 16, gap: 12 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={back}
-            style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#111827' }}
-          >
-            <Text style={{ color: 'white' }}>← Nazad</Text>
-          </TouchableOpacity>
-
-          <Text style={{ color: 'white', fontSize: 18 }}>Grounding 5–4–3–2–1</Text>
-          <View style={{ width: 70 }} />
+    <AppBackground>
+      <StackHeader title="Grounding 5–4–3–2–1" onBack={back} />
+      <View style={{ flex: 1, padding: theme.padding.screen, gap: theme.padding.sectionGap, paddingBottom: theme.padding.screen + 8 }}>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {STEPS.map((_, idx) => (
+            <View
+              key={idx}
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: idx <= i ? theme.colors.primary : theme.colors.cardBorder,
+              }}
+            />
+          ))}
         </View>
 
-        <Text style={{ color: '#94A3B8' }}>
+        <Text style={[theme.typography.caption, { color: theme.colors.textMuted }]}>
           Korak {i + 1}/{STEPS.length}
         </Text>
 
-        <View style={{ backgroundColor: '#111827', borderRadius: 18, padding: 14, gap: 10, borderWidth: 1, borderColor: '#1F2937' }}>
-          <Text style={{ color: 'white', fontSize: 18 }}>{step.title}</Text>
-          <Text style={{ color: '#94A3B8' }}>{step.prompt}</Text>
+        <View
+          style={{
+            backgroundColor: theme.colors.card,
+            borderRadius: theme.radius.card,
+            padding: theme.padding.card,
+            gap: 12,
+            borderWidth: 1,
+            borderColor: theme.colors.cardBorder,
+            ...theme.shadow.card,
+          }}
+        >
+          <Text style={[theme.typography.sectionTitle, { color: theme.colors.text }]}>{step.title}</Text>
+          <Text style={[theme.typography.body, { color: theme.colors.textMuted }]}>{step.prompt}</Text>
 
           <TextInput
             multiline
@@ -96,36 +119,33 @@ export default function GroundingScreen({ navigation, route }: any) {
             value={answers[i]}
             onChangeText={setAnswer}
             placeholder="Upiši ili samo opiši ukratko..."
-            placeholderTextColor="#64748B"
+            placeholderTextColor={theme.colors.textDim}
             style={{
-              backgroundColor: '#0F172A',
-              borderRadius: 14,
-              padding: 12,
-              color: 'white',
+              backgroundColor: theme.colors.input,
+              borderRadius: theme.radius.cardSmall,
+              padding: 14,
+              color: theme.colors.text,
               borderWidth: 1,
-              borderColor: '#1F2937',
-              minHeight: 110,
+              borderColor: theme.colors.cardBorder,
+              minHeight: 120,
               textAlignVertical: 'top',
+              fontFamily: theme.typography.fontRegular,
+              fontSize: 16,
             }}
           />
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity
-            onPress={back}
-            style={{ flex: 1, backgroundColor: '#111827', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#1F2937' }}
-          >
-            <Text style={{ color: 'white', textAlign: 'center' }}>Nazad</Text>
-          </TouchableOpacity>
+        <View style={{ flex: 1 }} />
 
-          <TouchableOpacity
-            onPress={next}
-            style={{ flex: 1, backgroundColor: '#3B82F6', padding: 12, borderRadius: 14 }}
-          >
-            <Text style={{ color: 'white', textAlign: 'center' }}>{done ? 'Gotovo' : 'Dalje'}</Text>
-          </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Button title={t('common.back')} variant="muted" onPress={back} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title={done ? t('common.done') : t('onboarding.next')} variant="primary" onPress={next} />
+          </View>
         </View>
       </View>
-    </SafeAreaView>
+    </AppBackground>
   );
 }

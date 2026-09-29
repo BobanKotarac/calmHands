@@ -9,6 +9,8 @@ import { devSeedInsightsData } from '../utils/devSeed';
 import { Modal } from 'react-native';
 import { PLACE_OPTIONS, SITUATION_OPTIONS } from '../constants/thoughtLogTags';
 import { useTranslation } from 'react-i18next';
+import { theme } from '../theme';
+import { onListenError } from '../utils/onListenError';
 
 type MoodDoc = { value: number; updatedAt?: any; dayId?: string };
 type ThoughtLogDoc = {
@@ -137,7 +139,7 @@ export default function InsightsScreen({ navigation }: any) {
       });
       filtered.sort((a, b) => a.id.localeCompare(b.id));
       setMoods(filtered);
-    });
+    }, onListenError);
 
     return unsub;
   }, [user, startMs]);
@@ -159,7 +161,7 @@ export default function InsightsScreen({ navigation }: any) {
         return ms == null ? true : ms >= startMs;
       });
       setThoughts(filtered);
-    });
+    }, onListenError);
 
     return unsub;
   }, [user, startMs]);
@@ -257,17 +259,8 @@ export default function InsightsScreen({ navigation }: any) {
   const colorArray = mode === 'mood' ? moodColors : panicColors;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0B1220' }} edges={['top']}>
-      <ScrollView style={{ flex: 1, backgroundColor: '#0B1220' }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#111827' }}
-        >
-          <Text style={{ color: 'white' }}>{t('common.back')}</Text>
-        </TouchableOpacity>
-
-        <Text style={{ color: 'white', fontSize: 22 }}>{t('insights.title')}</Text>
-
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['bottom']}>
+      <ScrollView style={{ flex: 1, backgroundColor: theme.colors.background }} contentContainerStyle={{ padding: 16, gap: 12 }}>
         {__DEV__ && (
           <TouchableOpacity
             onPress={async () => {
