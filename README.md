@@ -14,7 +14,7 @@ CalmHands is a React Native (Expo) mobile app for managing anxiety, urges, and d
 - **Reminders & notifications** — local reminders for mood check-ins.
 - **Localization** — English + Serbian (i18next).
 - **Guest vs account** — guests can try SOS tools; mood logging, plans, logs, and insights need an account.
-- **Premium (RevenueCat)** — Pro entitlement wired for TestFlight; store products can be connected later. See [docs/REVENUECAT.md](docs/REVENUECAT.md).
+- **Premium (RevenueCat)** — Pro entitlement wired for TestFlight; store products can be connected later. Full checklist: [docs/REVENUECAT.md](docs/REVENUECAT.md).
 
 ## Tech stack
 
